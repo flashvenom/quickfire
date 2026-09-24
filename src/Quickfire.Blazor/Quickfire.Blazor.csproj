@@ -43,7 +43,7 @@
 		<PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
 		<PackageReference Include="itext7" Version="9.4.0" />
 		<PackageReference Include="itext7.bouncy-castle-adapter" Version="9.4.0" />
-		<PackageReference Include="Markdig" Version="0.44.0" />
+		<PackageReference Include="Markdig" Version="1.4.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.12" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
