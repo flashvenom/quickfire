@@ -21,7 +21,7 @@ jobs:
           dotnet restore src/Quickfire.Call/Quickfire.Call.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1901%3BNU1902%3BNU1903%3BNU1904%3BNU1905'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet build src/Quickfire.Call/Quickfire.Call.csproj -c Release --no-restore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: foundation-test-results
