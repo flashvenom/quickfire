@@ -47,7 +47,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddMemoryCache();
 builder.Services.AddControllers();
-Env.Load();
+Env.NoClobber().Load(Path.Combine(builder.Environment.ContentRootPath, ".env"));
 bool detailedErrorsEnabled = builder.Configuration.GetValue<bool>("DetailedErrors:Enabled");
 
 // IDEN AND AUTH -- -- -- -   -     -     -      -             -           -            -           -   -      -  -   -  --  ---  ---  -   -      -         -    -      -  -        idenauth/
@@ -107,7 +107,11 @@ builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<Applica
 builder.Services.AddSyncfusionBlazor();
 builder.Services.AddFluentUIComponents();
 builder.Services.AddDataGridEntityFrameworkAdapter();
-Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("LICENSE");
+string? syncfusionLicense = Environment.GetEnvironmentVariable("SYNCFUSION");
+if (!string.IsNullOrWhiteSpace(syncfusionLicense))
+{
+    Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(syncfusionLicense);
+}
 
 // DEPENDENCIES -- -- -- -   -     -      -                -           -              -            -   -       -  -   -  - -  ---  --  -   -      -         -    -          -      injections/
 builder.Services.AddScoped<AttachmentService>();
