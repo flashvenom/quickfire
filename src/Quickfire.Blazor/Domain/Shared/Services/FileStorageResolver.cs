@@ -80,6 +80,11 @@ namespace Quickfire.Blazor.Domain.Shared.Services
                 return $"{roots.PublicBaseUrl.TrimEnd('/')}/{relative}";
             }
 
+            if (roots.Mode == FileStorageMode.LocalDesktop && !roots.PreferFileSchemeLinks)
+            {
+                return "/" + string.Join("/", segments.Select(Uri.EscapeDataString));
+            }
+
             return BuildMappedFilePath(attachment);
         }
 

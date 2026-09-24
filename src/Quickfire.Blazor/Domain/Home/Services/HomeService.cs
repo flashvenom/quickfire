@@ -221,6 +221,7 @@ namespace Quickfire.Blazor.Domain.Shared.Services
         public async Task<List<DailyTask>> GetDailyTasksAsync()
         {
             var currentUser = _stateService.CurrentUser;
+            if (currentUser is null) return [];
             var today = DateTime.Today;
 
             using var context = _dbContextFactory.CreateDbContext();
@@ -237,6 +238,7 @@ namespace Quickfire.Blazor.Domain.Shared.Services
         public async Task<List<DailyTask>> GetDailyCompletedTasksAsync()
         {
             var currentUser = _stateService.CurrentUser;
+            if (currentUser is null) return [];
             var today = DateTime.Today;
 
             using var context = _dbContextFactory.CreateDbContext();

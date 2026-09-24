@@ -17,7 +17,8 @@ namespace Quickfire.Blazor.Domain.Shared.Models
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            // Explicitly empty roots/URLs must survive round trips instead of reviving legacy defaults.
+            DefaultIgnoreCondition = JsonIgnoreCondition.Never,
             WriteIndented = false
         };
 

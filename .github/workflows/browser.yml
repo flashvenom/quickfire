@@ -1,0 +1,42 @@
+name: Licensed browser smoke
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: windows-latest
+    env:
+      QUICKFIRE_BROWSER_SYNCFUSION_LICENSE: ${{ secrets.QUICKFIRE_BROWSER_SYNCFUSION_LICENSE || secrets.OPENFIRE_BROWSER_SYNCFUSION_LICENSE }}
+      QUICKFIRE_BROWSER_HOST_DIR: ${{ github.workspace }}/artifacts/browser-host
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/Quickfire.BrowserTests/package-lock.json
+      - name: Require licensed browser configuration
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:QUICKFIRE_BROWSER_SYNCFUSION_LICENSE)) {
+            throw 'Configure repository secret QUICKFIRE_BROWSER_SYNCFUSION_LICENSE before running the browser release gate.'
+          }
+      - name: Publish disposable test host
+        shell: pwsh
+        run: dotnet publish src/Quickfire.Blazor/Quickfire.Blazor.csproj -c Release -o artifacts/browser-host
+      - name: Install browser test dependencies
+        working-directory: tests/Quickfire.BrowserTests
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify login, clients, attachments and pairing
+        working-directory: tests/Quickfire.BrowserTests
+        shell: pwsh
+        run: npm test

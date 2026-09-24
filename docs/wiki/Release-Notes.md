@@ -1,5 +1,9 @@
 Release notes for the open-source edition.
 
+## v1.2.0 — Reliable Foundation (unreleased)
+- Maintained .NET 10 tooling, restartable SQLite setup and secure paired helpers.
+- Details and release gates: [Openfire 1.2](Release-v1.2.md).
+
 ## v1.1.1 (2026-02-07)
 - Highlights: Company Manual and Forms Library
 - Full details: `docs/wiki/Release-v1.1.1.md`

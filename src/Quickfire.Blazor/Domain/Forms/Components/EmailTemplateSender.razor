@@ -219,12 +219,12 @@
         return "";
     }
 
-    private void SendOutlookEmail()
+    private async Task SendOutlookEmail()
     {
         string toEmail = GetContactEmail(selectedContact);
         string subject = GetProcessedSubject();
         string body = GetProcessedBody();
-        _ = OutlookNewEmail(toEmail, subject, body);
+        await OutlookNewEmail(toEmail, subject, body);
     }
 
     public async Task OutlookNewEmail(string toEmail = null, string subject = null, string body = null)

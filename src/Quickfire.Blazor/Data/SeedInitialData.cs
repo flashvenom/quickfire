@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Quickfire.Blazor.Domain.Forms.Models;
 using Quickfire.Blazor.Domain.Shared.Models;
 using Quickfire.Blazor.Domain.Attachments.Models;
@@ -14,6 +14,8 @@ namespace Quickfire.Blazor.Data
         {
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var context = serviceProvider.GetRequiredService<ApplicationDbContext>();
+            var config = serviceProvider.GetRequiredService<IConfiguration>();
+            string Setting(string key, string fallback) => string.IsNullOrWhiteSpace(config[key]) ? fallback : config[key]!.Trim();
 
             var defaultHomepageLayout = new HomepageLayout
             {
@@ -26,12 +28,12 @@ namespace Quickfire.Blazor.Data
             };
             var defaultHomepageLayoutJson = defaultHomepageLayout.ToJson();
 
-            var initialAdminEmail = ReadEnvOrDefault("ADMIN_EMAIL", "admin@quickfire.local");
-            var initialAdminUsername = ReadEnvOrDefault("ADMIN_USERNAME", initialAdminEmail);
-            var initialAdminFirstName = ReadEnvOrDefault("ADMIN_FIRSTNAME", "Admin");
-            var initialAdminLastName = ReadEnvOrDefault("ADMIN_LASTNAME", "User");
-            var initialAdminPassword = ReadEnvOrDefault("ADMIN_PASSWORD", "Password123!");
-            var initialAdminPicture = ReadEnvOrDefault("ADMIN_PICTURE", "default.jpg");
+            var initialAdminEmail = Setting("Admin:Email", "admin@quickfire.local");
+            var initialAdminUsername = Setting("Admin:Username", initialAdminEmail);
+            var initialAdminFirstName = Setting("Admin:FirstName", "Admin");
+            var initialAdminLastName = Setting("Admin:LastName", "User");
+            var initialAdminPassword = config["Admin:Password"];
+            var initialAdminPicture = Setting("Admin:Picture", "default.jpg");
 
             ApplicationUser? adminUser = null;
 
@@ -52,7 +54,9 @@ namespace Quickfire.Blazor.Data
                     HomepageLayoutJSON = defaultHomepageLayoutJson
                 };
 
-                var bootstrapPassword = string.IsNullOrWhiteSpace(initialAdminPassword) ? "Password123!" : initialAdminPassword;
+                if (string.IsNullOrWhiteSpace(initialAdminPassword))
+                    throw new InvalidOperationException("First-run setup requires ADMIN_PASSWORD (or Admin:Password). Set a unique password and restart; initialization will resume safely.");
+                var bootstrapPassword = initialAdminPassword;
                 var result = userManager.CreateAsync(adminUser, bootstrapPassword).Result;
 
                 if (!result.Succeeded)
@@ -142,7 +146,7 @@ namespace Quickfire.Blazor.Data
                 var settings = new Quickfire.Blazor.Domain.Shared.Models.Settings
                 {
                     FileStore = FileStoreType.Local,
-                    FileStorage = FileStorageSettings.CreateDefault(),
+                    FileStorage = CreateInitialStorage(serviceProvider),
                     DisablePlugins = false,
                     SandbagMode = false,
                     FakeyMode = false
@@ -201,10 +205,20 @@ namespace Quickfire.Blazor.Data
             context.SaveChanges();
         }
 
-        private static string ReadEnvOrDefault(string key, string fallback)
+        private static FileStorageSettings CreateInitialStorage(IServiceProvider services)
         {
-            var value = Environment.GetEnvironmentVariable(key);
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            var environment = services.GetRequiredService<IWebHostEnvironment>();
+            var root = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+            return new FileStorageSettings
+            {
+                Mode = FileStorageMode.LocalDesktop,
+                ServerAbsoluteRoot = root,
+                LocalRootPath = root,
+                NetworkSharePath = null,
+                PublicBaseUrl = null,
+                PreferFileSchemeLinks = false,
+                StripUploadsFromMappedPath = false
+            }.Normalize();
         }
     }
 }

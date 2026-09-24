@@ -17,4 +17,5 @@
   * [Renewal Data Share](reference/Renewal-Data-Share)
   * [Word Doc Integration](reference/Word-Doc-Integration)
 * **Guides**
+  * [Helper Connections](guides/Helper-Connections)
   * [Desktop Builds](guides/Quickfire-Desktop-Builds)

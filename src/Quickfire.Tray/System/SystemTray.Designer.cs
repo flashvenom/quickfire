@@ -72,7 +72,6 @@ namespace Quickfire.Tray
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Name = "Form1";
             this.Text = "Form1";
-            this.Load += new System.EventHandler(this.SystemTray_Load);
             this.EmberContextMenu.ResumeLayout(false);
             this.ResumeLayout(false);
 

@@ -1,8 +1,8 @@
-﻿@namespace Quickfire.Blazor.Components.Layout
+@namespace Quickfire.Blazor.Components.Layout
 @inherits LayoutComponentBase
+@implements IDisposable
 @using Quickfire.Blazor.Data
 @using Quickfire.Blazor.Domain.Logs
-@using Quickfire.Blazor.Domain.Ember
 @using Quickfire.Blazor.Domain.Clients.Models
 @using Quickfire.Blazor.Domain.Shared.Helpers
 @using Quickfire.Blazor.Domain.Shared.Services
@@ -11,7 +11,7 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
-@using Microsoft.AspNetCore.SignalR.Client
+@using Quickfire.Blazor.Infrastructure.Bridge
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.FluentUI.AspNetCore.Components
 @using Microsoft.Extensions.Configuration;
@@ -23,16 +23,16 @@
 @inject NavigationManager NavigationManager
 @inject SharedService SharedService
 @inject StateService _stateService
-@inject EmberService EmberService
 @inject HomeService HomeService
 @inject AppJsInterop JsInterop
 @inject ILoggingService _log
 @inject IToastService ToastService
 @inject ILogger<MainLayout> Logger
 @inject IConfiguration Configuration
+@inject BridgeNotifications BridgeNotifications
 
 <CascadingValue Value="_stateService">
-    <div id="sf-top-bar" class="top-bar">
+    <div id="sf-top-bar" class="top-bar" data-quickfire-interactive="@(isInteractive ? "true" : "false")">
         <div class="left-icons">
             <div class="surefire-main-logo" title="Quickfire">
                 <img src="/img/home/spinq/qspin00000.png" alt="App Logo" class="app-logo" />
@@ -78,7 +78,7 @@
         <NavMenu />
         <main>
             <article>
-                @if (_stateService.IsInitialized && !forceLoader)
+                @if (_stateService.IsInitialized && _stateService.CurrentUser is not null && !forceLoader)
                 {
                     @Body
                 }
@@ -103,7 +103,6 @@
 <FluentMessageBarProvider />
 <FluentMenuProvider />
 <FluentKeyCodeProvider />
-<script src="/js/enhanced-ai-chat.js"></script>
 <style>
     :root .fluent-messagebar {
         width: calc(100% - 39px);
@@ -120,11 +119,13 @@
     public int CallerClientId { get; set; }
     public int CallerContactId { get; set; }
     private bool isDisposed = false;
+    private bool isInteractive;
     private bool forceLoader = false;
     private bool isProfilePage = false;
     private bool componentInitialized = false;
     private string companyName = "Quickfire";
-    private HubConnection? hubConnection;
+    private IDisposable? callSubscription;
+    private int callSubscriptionRevision;
     private ClaimsPrincipal User { get; set; } = default!;
     private ApplicationUser? AppUser { get; set; }
     private bool isCommsPage = false;
@@ -134,6 +135,7 @@
     {
         base.OnInitialized();
         NavigationManager.LocationChanged += OnLocationChanged;
+        AuthStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
         UpdatePageContextFlags();
     }
 
@@ -153,46 +155,78 @@
                 await _stateService.InitializeStateAsync(AuthStateProvider.GetAuthenticationStateAsync());
             }
 
-            if (_stateService.CurrentUser is null)
-            {
-                NavigationManager.NavigateTo(
-                    $"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}",
-                    forceLoad: true);
-                return;
-            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "StateService initialization failed");
+            return;
+        }
+
+        // Keep navigation outside the initialization catch: during prerendering
+        // NavigationException is how Blazor completes an HTTP redirect.
+        if (_stateService.CurrentUser is null)
+        {
+            NavigationManager.NavigateTo(
+                $"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}",
+                forceLoad: true, replace: true);
+            return;
         }
 
         await InitializeUserProfileAsync();
-        _ = StartSignalRAsync();
+        await SubscribeToCallsAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            isInteractive = true;
+            StateHasChanged();
             await JsInterop.InitializeTopBarAnimationsAsync();
         }
     }
 
 
-    private async Task StartSignalRAsync()
+    private async Task SubscribeToCallsAsync()
     {
+        var revision = ++callSubscriptionRevision;
+        callSubscription?.Dispose();
+        callSubscription = null;
         try
         {
-            hubConnection = new HubConnectionBuilder().WithUrl(NavigationManager.ToAbsoluteUri("/notificationHub")).Build();
-            hubConnection.On<CallInfo>("ReceiveCallNotification", callInfo =>
-            {
-                _ = InvokeAsync(() => ShowIncomingCallToast(callInfo));
-            });
-            await hubConnection.StartAsync();
+            var state = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (isDisposed || revision != callSubscriptionRevision || state.User.Identity?.IsAuthenticated != true)
+                return;
+            var subscribedUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            callSubscription = BridgeNotifications.Subscribe(state.User, callInfo =>
+                isDisposed ? Task.CompletedTask : InvokeAsync(async () =>
+                {
+                    var currentState = await AuthStateProvider.GetAuthenticationStateAsync();
+                    if (!isDisposed && revision == callSubscriptionRevision && currentState.User.Identity?.IsAuthenticated == true &&
+                        currentState.User.FindFirstValue(ClaimTypes.NameIdentifier) == subscribedUserId)
+                        await ShowIncomingCallToast(callInfo);
+                }));
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to start SignalR connection");
+            Logger.LogWarning("Could not subscribe to incoming calls ({ErrorType}).", ex.GetType().Name);
+        }
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> stateTask)
+    {
+        callSubscriptionRevision++;
+        callSubscription?.Dispose();
+        callSubscription = null;
+        try
+        {
+            await stateTask;
+            if (!isDisposed)
+                await InvokeAsync(SubscribeToCallsAsync);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Could not update the incoming-call subscription ({ErrorType}).", ex.GetType().Name);
         }
     }
     private async Task InitializeUserProfileAsync()
@@ -267,7 +301,6 @@
             var matches = await HomeService.GetCallerInfo(callInfo);
             string title = "Incoming Call";
             string message = $"From: {callerName}";
-            string clientId = null; // Default to null if no client match
 
             if (matches == null)
             {
@@ -288,7 +321,6 @@
                     // Set contact-specific details
                     title = $"Incoming Call from {matchedClient.Name}";
                     message = $"CONTACT: {matches.MatchedContact.FirstName} {matches.MatchedContact.LastName}";
-                    clientId = CallerClientId.ToString();
 
                     // Display success toast with contact information
                     ToastService.ShowCommunicationToast(new ToastParameters<CommunicationToastContent>()
@@ -313,7 +345,6 @@
                     // Set client-specific details
                     title = $"Incoming Call from {matchedClient.Name}";
                     message = $"Call ID: {callerName}";
-                    clientId = CallerClientId.ToString();
 
                     // Display success toast with client information
                     ToastService.ShowCommunicationToast(new ToastParameters<CommunicationToastContent>()
@@ -331,8 +362,6 @@
                     });
                 }
             }
-            var notificationParams = new List<string> { title, message, clientId };
-            await EmberService.RunEmberFunction("ShowTrayNotification", notificationParams);
         }
         catch (Exception ex)
         {
@@ -363,14 +392,15 @@
     }
 
     //Disposal
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
         // Set disposed flag first to prevent any new operations
         isDisposed = true;
+        callSubscriptionRevision++;
 
-        if (hubConnection != null)
-        {
-            await hubConnection.DisposeAsync();
-        }
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        callSubscription?.Dispose();
+        callSubscription = null;
     }
 }

@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using Quickfire.Shared.Bridge;
 using Quickfire.Desktop.Interop;
 using Quickfire.Tray;
 
@@ -11,249 +9,146 @@ namespace Quickfire.Desktop.Services;
 
 public interface IDesktopEmberBridge : IAsyncDisposable
 {
-    Task EnsureConnectedAsync(Uri hostBaseUri, CancellationToken cancellationToken = default);
+    event Action<bool>? ConnectionStateChanged;
+    Task<bool> EnsureConnectedAsync(Uri hostBaseUri, CancellationToken cancellationToken = default);
+    Task PairAsync(Uri hostBaseUri, string server, string token, CancellationToken cancellationToken = default);
+    Task ForgetPairingAsync();
 }
 
 public sealed class DesktopEmberBridge : IDesktopEmberBridge
 {
-    private static readonly TimeSpan[] ReconnectDelays =
-    [
-        TimeSpan.Zero,
-        TimeSpan.FromSeconds(2),
-        TimeSpan.FromSeconds(10),
-        TimeSpan.FromSeconds(30)
-    ];
-
+    public event Action<bool>? ConnectionStateChanged;
     private readonly ILogger<DesktopEmberBridge> _logger;
-    private readonly SemaphoreSlim _connectionGate = new(1, 1);
-
+    private readonly NativeCredentialStore _store;
+    private readonly BridgeRequestTracker _requests = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _commandGate = new(1, 1);
     private HubConnection? _connection;
-    private Uri? _hubUri;
-    private string? _userId;
+    private NativeExecutionSession? _execution;
 
-    public DesktopEmberBridge(ILogger<DesktopEmberBridge> logger)
+    public DesktopEmberBridge(ILogger<DesktopEmberBridge> logger, string? credentialDirectory = null)
     {
         _logger = logger;
+        _store = new NativeCredentialStore("desktop", credentialDirectory);
     }
 
-    public async Task EnsureConnectedAsync(Uri hostBaseUri, CancellationToken cancellationToken = default)
+    public async Task<bool> EnsureConnectedAsync(Uri hostBaseUri, CancellationToken cancellationToken = default)
     {
-        if (hostBaseUri is null)
-        {
-            throw new ArgumentNullException(nameof(hostBaseUri));
-        }
-
-        var hubUri = BuildHubUri(hostBaseUri);
-        await _connectionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (_connection is not null && _hubUri == hubUri)
-            {
-                if (_connection.State == HubConnectionState.Disconnected)
+            var credential = _store.Load();
+            if (credential is null) return false;
+            if (!NativeBridgeSafety.SameOrigin(credential.Origin, NativeBridgeSafety.ServerOrigin(hostBaseUri.ToString())))
+                throw new InvalidOperationException("Pair the helper with the server displayed in this window.");
+            if (_connection is not null && _connection.State != HubConnectionState.Disconnected) return true;
+            if (_connection is not null) { _execution?.Dispose(); await _connection.DisposeAsync(); }
+            var connection = new HubConnectionBuilder()
+                .WithUrl(new Uri(credential.Origin, "emberHub"), options =>
                 {
-                    _logger.LogInformation("Restarting Ember bridge connection.");
-                    await _connection.StartAsync(cancellationToken).ConfigureAwait(false);
-                    await JoinGroupAsync(cancellationToken).ConfigureAwait(false);
-                }
-                return;
-            }
-
-            await DisposeConnectionInternalAsync().ConfigureAwait(false);
-
-            _hubUri = hubUri;
-            _userId = ResolveUserId();
-            if (string.IsNullOrWhiteSpace(_userId))
-            {
-                _logger.LogWarning("Unable to resolve a Windows user name for Ember bridge registration.");
-                return;
-            }
-
-            _connection = new HubConnectionBuilder()
-                .WithUrl(hubUri)
-                .WithAutomaticReconnect(ReconnectDelays)
-                .AddJsonProtocol()
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(credential.Token);
+                    options.Transports = HttpTransportType.LongPolling;
+                    options.HttpMessageHandlerFactory = _ => new OriginBoundHandler(credential.Origin);
+                })
+                .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30) })
                 .Build();
-
-            RegisterHandlers(_connection);
-
-            _logger.LogInformation("Connecting to Ember hub at {HubUri}", hubUri);
-            await _connection.StartAsync(cancellationToken).ConfigureAwait(false);
-            await JoinGroupAsync(cancellationToken).ConfigureAwait(false);
+            _connection = connection;
+            var execution = new NativeExecutionSession();
+            _execution = execution;
+            connection.On<BridgeCommand>("ReceiveEmberCommand", command => HandleCommandAsync(connection, execution, command));
+            connection.Reconnecting += _ => { execution.Disconnect(); ConnectionStateChanged?.Invoke(false); return Task.CompletedTask; };
+            connection.Reconnected += _ => { execution.Reconnect(); ConnectionStateChanged?.Invoke(true); return Task.CompletedTask; };
+            connection.Closed += _ => { execution.Disconnect(); ConnectionStateChanged?.Invoke(false); _logger.LogInformation("Native helper disconnected. Check pairing before reconnecting."); return Task.CompletedTask; };
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(15));
+            await connection.StartAsync(timeout.Token);
+            ConnectionStateChanged?.Invoke(true);
+            return true;
         }
+        finally { _gate.Release(); }
+    }
+
+    public async Task PairAsync(Uri hostBaseUri, string server, string token, CancellationToken cancellationToken = default)
+    {
+        if (!NativeBridgeSafety.SameOrigin(NativeBridgeSafety.ServerOrigin(server), NativeBridgeSafety.ServerOrigin(hostBaseUri.ToString())))
+            throw new InvalidOperationException("Pair the helper with the server displayed in this window.");
+        await DisposeAsync();
+        _store.Save(server, token);
+        await EnsureConnectedAsync(hostBaseUri, cancellationToken);
+    }
+
+    public async Task ForgetPairingAsync() { await DisposeAsync(); _store.Forget(); }
+
+    private async Task HandleCommandAsync(HubConnection connection, NativeExecutionSession execution, BridgeCommand command)
+    {
+        if (command is null || !_requests.TryBegin(command.RequestId)) return;
+        var response = new BridgeResponse { RequestId = command.RequestId };
+        var entered = false;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(execution.Token);
+        var token = deadline.Token;
+        void EnsureCurrent()
+        {
+            execution.EnsureExecutable(command, token);
+            if (!ReferenceEquals(connection, _connection) || connection.State != HubConnectionState.Connected)
+                throw new OperationCanceledException();
+        }
+        try
+        {
+            NativeBridgeSafety.ValidateCommand(command);
+            deadline.CancelAfter(command.ExpiresUtc - DateTimeOffset.UtcNow);
+            entered = await _commandGate.WaitAsync(0, token);
+            if (!entered) { response.Error = "The helper is busy. The command was not queued."; return; }
+            EnsureCurrent();
+            switch (command.Command)
+            {
+                case "Windows_OpenFolder": case "Windows_OpenFile":
+                    await RunOnStaThreadAsync(() => { EnsureCurrent(); WindowsControl.PerformWindowsFunction(command.Command, command.Parameters); }); break;
+                case "OutlookSearch_EmailStrictToFrom": case "OutlookSearch_EmailBroad": case "OutlookSearch_Policy":
+                case "OutlookSearch_SmartSearch": case "OutlookSearch_Carrier": case "OutlookEmail_CreateNew":
+                    await RunOnStaThreadAsync(() => { EnsureCurrent(); OutlookControl.PerformOutlookFunction(command.Command, command.Parameters); }); break;
+                case "GetWordDocContents":
+                    response.Error = "Word document access requires the separately paired Windows tray helper.";
+                    return;
+                case "ShowTrayNotification":
+                    await NotificationInterop.ShowTrayNotificationAsync(command.Parameters, _logger, token); break;
+                case "ShowStaffChat":
+                    await MessagingInterop.ShowStaffChatNotificationAsync(command.Parameters, _logger, token); break;
+                case "Windows_ShowCallNotification":
+                    if (command.Parameters.Count < 2) throw new ArgumentException();
+                    await NotificationInterop.ShowTrayNotificationAsync(new[] { "Incoming call", command.Parameters[0] + " " + command.Parameters[1] }, _logger, token); break;
+                case "update_available": case "update_prompt":
+                    await UpdateInterop.HandleUpdateCommandAsync(command.Command, command.Parameters, _logger, token); break;
+                default: throw new NotSupportedException();
+            }
+            response.Succeeded = true;
+        }
+        catch { response.Error = "The helper could not complete this command. Check the requested document or native application."; }
         finally
         {
-            _connectionGate.Release();
-        }
-    }
-
-    private static Uri BuildHubUri(Uri baseUri)
-    {
-        if (!baseUri.ToString().EndsWith("/", StringComparison.Ordinal))
-        {
-            baseUri = new Uri(baseUri.ToString() + "/");
-        }
-
-        return new Uri(baseUri, "emberHub");
-    }
-
-    private void RegisterHandlers(HubConnection connection)
-    {
-        connection.On<string, List<string>>("ReceiveEmberCommand", async (command, parameters) =>
-        {
-            await HandleEmberCommandAsync(command, parameters ?? new List<string>()).ConfigureAwait(false);
-        });
-
-        connection.Reconnecting += ex =>
-        {
-            _logger.LogWarning(ex, "Ember bridge connection lost, attempting to reconnect.");
-            return Task.CompletedTask;
-        };
-
-        connection.Reconnected += async _ =>
-        {
-            _logger.LogInformation("Ember bridge connection re-established.");
-            await JoinGroupAsync(CancellationToken.None).ConfigureAwait(false);
-        };
-
-        connection.Closed += ex =>
-        {
-            _logger.LogWarning(ex, "Ember bridge connection closed.");
-            return Task.CompletedTask;
-        };
-    }
-
-    private async Task JoinGroupAsync(CancellationToken cancellationToken)
-    {
-        if (_connection is null || _connection.State != HubConnectionState.Connected)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_userId))
-        {
-            _logger.LogWarning("Skipping Ember group join because user ID is missing.");
-            return;
-        }
-
-        try
-        {
-            await _connection.InvokeAsync("JoinGroup", _userId, cancellationToken).ConfigureAwait(false);
-            _logger.LogInformation("Registered Ember bridge for Windows user {User}", _userId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to join Ember group for user {User}", _userId);
-        }
-    }
-
-    private async Task HandleEmberCommandAsync(string? emberFunction, List<string> parameters)
-    {
-        if (string.IsNullOrWhiteSpace(emberFunction))
-        {
-            _logger.LogWarning("Received an empty Ember command.");
-            return;
-        }
-
-        var normalized = emberFunction.ToLowerInvariant();
-        _logger.LogInformation("Processing Ember command {Command} (params: {Count})", emberFunction, parameters.Count);
-
-            try
-            {
-                if (normalized.StartsWith("windows_", StringComparison.Ordinal))
-                {
-                    await Task.Run(() => WindowsControl.PerformWindowsFunction(emberFunction, parameters)).ConfigureAwait(false);
-                }
-                else if (normalized.StartsWith("outlook", StringComparison.Ordinal))
-                {
-                    await RunOnStaThreadAsync(() => OutlookControl.PerformOutlookFunction(emberFunction, parameters)).ConfigureAwait(false);
-                }
-                else if (string.Equals(normalized, "showtraynotification", StringComparison.Ordinal))
-                {
-                    await NotificationInterop.ShowTrayNotificationAsync(parameters, _logger).ConfigureAwait(false);
-                }
-                else if (string.Equals(normalized, "showstaffchat", StringComparison.Ordinal))
-                {
-                    await MessagingInterop.ShowStaffChatNotificationAsync(parameters, _logger).ConfigureAwait(false);
-                }
-                else if (normalized.StartsWith("update", StringComparison.Ordinal))
-                {
-                    await UpdateInterop.HandleUpdateCommandAsync(normalized, parameters, _logger).ConfigureAwait(false);
-                }
-                else
-                {
-                    _logger.LogWarning("No handler registered for Ember command {Command}", emberFunction);
-                }
-            }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error executing Ember command {Command}", emberFunction);
+            if (entered) _commandGate.Release();
+            // No response queue: reconnecting must never replay a command or an uncertain completion.
+            try { await connection.InvokeAsync("CompleteCommand", response); }
+            catch { _logger.LogWarning("Native command response unavailable; the action was not replayed."); }
         }
     }
 
     private static Task RunOnStaThreadAsync(Action action)
     {
-        if (action is null)
-        {
-            throw new ArgumentNullException(nameof(action));
-        }
-
-        var tcs = new TaskCompletionSource<object?>();
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
-            try
-            {
-                action();
-                tcs.SetResult(null);
-            }
-            catch (Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-        })
-        {
-            IsBackground = true
-        };
+            try { action(); completion.SetResult(); }
+            catch (Exception ex) { completion.SetException(ex); }
+        }) { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        return tcs.Task;
-    }
-
-    private static string ResolveUserId()
-    {
-        try
-        {
-            return Environment.UserName;
-        }
-        catch
-        {
-            return string.Empty;
-        }
+        return completion.Task;
     }
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeConnectionInternalAsync().ConfigureAwait(false);
-    }
-
-    private async Task DisposeConnectionInternalAsync()
-    {
-        if (_connection is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await _connection.DisposeAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Error while disposing Ember bridge connection.");
-        }
-        finally
-        {
-            _connection = null;
-            _hubUri = null;
-        }
+        await _gate.WaitAsync();
+        try { _execution?.Dispose(); var previous = _connection; _connection = null; if (previous is not null) await previous.DisposeAsync(); }
+        finally { _gate.Release(); }
     }
 }

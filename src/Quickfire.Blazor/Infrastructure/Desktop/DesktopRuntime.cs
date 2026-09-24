@@ -87,7 +87,7 @@ namespace Quickfire.Blazor.Infrastructure.Desktop
                 };
 
                 var password = string.IsNullOrWhiteSpace(adminOptions.TemporaryPassword)
-                    ? "ChangeMe!123"
+                    ? throw new InvalidOperationException("First-run desktop setup requires an explicit administrator password.")
                     : adminOptions.TemporaryPassword!;
 
                 var createResult = await userManager.CreateAsync(user, password).ConfigureAwait(false);
@@ -126,20 +126,7 @@ namespace Quickfire.Blazor.Infrastructure.Desktop
                 logger?.LogInformation("Updated desktop admin profile for {Email}", email);
             }
 
-            if (!string.IsNullOrWhiteSpace(adminOptions.TemporaryPassword))
-            {
-                var resetToken = await userManager.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
-                var resetResult = await userManager.ResetPasswordAsync(user, resetToken, adminOptions.TemporaryPassword).ConfigureAwait(false);
-                if (resetResult.Succeeded)
-                {
-                    logger?.LogInformation("Reset password for desktop admin {Email}", email);
-                }
-                else
-                {
-                    logger?.LogWarning("Failed to reset admin password: {Errors}", string.Join(", ", resetResult.Errors.Select(e => e.Description)));
-                }
-            }
-
+            // A persisted bootstrap password must never reset an existing account.
             return user;
         }
 

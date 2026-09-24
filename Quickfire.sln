@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.0.11205.157
@@ -103,12 +103,22 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Misc", "Misc", "{F719A4A4-5
 		loot\install\quickfire-installer.iss = loot\install\quickfire-installer.iss
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quickfire.Founation.Tests", "tests\Quickfire.Founation.Tests\Quickfire.Founation.Tests.csproj", "{684EB34F-5A4E-4563-BF43-BA1F3831A09B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quickfire.Shared", "src\Quickfire.Shared\Quickfire.Shared.csproj", "{72881F61-793B-4C27-8138-B87C2B162CE0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{72881F61-793B-4C27-8138-B87C2B162CE0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72881F61-793B-4C27-8138-B87C2B162CE0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72881F61-793B-4C27-8138-B87C2B162CE0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72881F61-793B-4C27-8138-B87C2B162CE0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{334C9F6A-D576-B671-BC4B-D95D58AF9203}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{334C9F6A-D576-B671-BC4B-D95D58AF9203}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{334C9F6A-D576-B671-BC4B-D95D58AF9203}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -121,6 +131,10 @@ Global
 		{5A5B9286-22B3-47B5-B0DE-2B21D095BCD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A5B9286-22B3-47B5-B0DE-2B21D095BCD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A5B9286-22B3-47B5-B0DE-2B21D095BCD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{684EB34F-5A4E-4563-BF43-BA1F3831A09B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{684EB34F-5A4E-4563-BF43-BA1F3831A09B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{684EB34F-5A4E-4563-BF43-BA1F3831A09B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{684EB34F-5A4E-4563-BF43-BA1F3831A09B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -136,6 +150,7 @@ Global
 		{82167FB3-6F94-4CB3-8DFA-E93506B2C036} = {8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}
 		{247B6D5A-8481-45E6-9196-9F59874C03C7} = {8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}
 		{F719A4A4-52F1-49FF-BC54-0B9B76A40330} = {8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}
+		{684EB34F-5A4E-4563-BF43-BA1F3831A09B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1DB27740-CCD5-4B49-8E91-2DF484708326}

@@ -67,7 +67,7 @@ namespace Quickfire.Blazor.Domain.Shared.Services
         //_____________________________________________________________________________________//
         //=====================================================================================//
         // Initialization --------------------------------------------------------------------//
-        private readonly TaskCompletionSource<bool> _initializationTcs = new();
+        private readonly TaskCompletionSource<bool> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task InitializationTask => _initializationTcs.Task;
         public async Task InitializeStateAsync(Task<AuthenticationState> authStateTask)
         {
@@ -85,24 +85,19 @@ namespace Quickfire.Blazor.Domain.Shared.Services
                     return;
                 }
 
-                // Load system settings first
-                var settings = await GetSystemSettingsAsync();
-                _disablePlugins = settings?.DisablePlugins ?? false;
-                _sandbagMode = settings?.SandbagMode ?? false;
-                _fakeyMode = settings?.FakeyMode ?? false;
-
-
                 // User initialization
-                SurefireVersion = _configuration["Surefire:System:Version"] ?? "v0.0.0";
+                SurefireVersion = _configuration["Surefire:System:Version"] ?? $"v{typeof(StateService).Assembly.GetName().Version?.ToString(3)}";
                 var authState = await authStateTask;
                 var user = authState.User;
 
                 using var context = _dbContextFactory.CreateDbContext();
                 DatabaseProvider = context.Database.ProviderName ?? string.Empty;
 
-                if (user.Identity?.IsAuthenticated == true)
+                CurrentUser = null;
+                UserPreferences = null;
+                var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(userId))
                 {
-                    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
                     CurrentUser = await context.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
                     if (CurrentUser != null)
@@ -116,6 +111,19 @@ namespace Quickfire.Blazor.Domain.Shared.Services
                         UserPreferences = Models.UserPreferences.FromApplicationUser(CurrentUser);
                     }
                 }
+
+                if (CurrentUser is null)
+                {
+                    // Unblock components waiting for this attempt, but do not expose
+                    // application data or mark a missing account as ready to render.
+                    _initializationTcs.TrySetResult(false);
+                    return;
+                }
+
+                var settings = await GetSystemSettingsAsync();
+                _disablePlugins = settings?.DisablePlugins ?? false;
+                _sandbagMode = settings?.SandbagMode ?? false;
+                _fakeyMode = settings?.FakeyMode ?? false;
 
                 // CORE INITIALIZATION - Only essential app data that blocks UI
                 var coreInitializationTasks = new List<Task>
@@ -131,7 +139,7 @@ namespace Quickfire.Blazor.Domain.Shared.Services
 
                 // Mark as initialized BEFORE background tasks
                 _isInitialized = true;
-                _initializationTcs.SetResult(true);
+                _initializationTcs.TrySetResult(true);
 
             }
             finally
@@ -568,59 +576,48 @@ namespace Quickfire.Blazor.Domain.Shared.Services
                 return;
             }
 
-            var modeOverride = ReadConfigOrEnv("FileStorage:Mode", "OPENFIRE_FILESTORAGE_MODE");
+            var modeOverride = _configuration["FileStorage:Mode"];
             if (!string.IsNullOrWhiteSpace(modeOverride) &&
                 Enum.TryParse<FileStorageMode>(modeOverride, true, out var parsedMode))
             {
                 storage.Mode = parsedMode;
             }
 
-            var mappedOverride = ReadConfigOrEnv("FileStorage:MappedRoot", "OPENFIRE_FILESTORAGE_MAPPED_ROOT");
+            var mappedOverride = _configuration["FileStorage:MappedRoot"];
             if (!string.IsNullOrWhiteSpace(mappedOverride))
             {
                 storage.NetworkSharePath = mappedOverride;
             }
 
-            var absoluteOverride = ReadConfigOrEnv("FileStorage:ServerRoot", "OPENFIRE_FILESTORAGE_SERVER_ROOT");
+            var absoluteOverride = _configuration["FileStorage:ServerRoot"];
             if (!string.IsNullOrWhiteSpace(absoluteOverride))
             {
                 storage.ServerAbsoluteRoot = absoluteOverride;
             }
 
-            var baseUrlOverride = ReadConfigOrEnv("FileStorage:PublicBaseUrl", "OPENFIRE_FILESTORAGE_PUBLIC_BASEURL");
+            var baseUrlOverride = _configuration["FileStorage:PublicBaseUrl"];
             if (!string.IsNullOrWhiteSpace(baseUrlOverride))
             {
                 storage.PublicBaseUrl = baseUrlOverride;
             }
 
-            var localRootOverride = ReadConfigOrEnv("FileStorage:LocalRoot", "OPENFIRE_FILESTORAGE_LOCAL_ROOT");
+            var localRootOverride = _configuration["FileStorage:LocalRoot"];
             if (!string.IsNullOrWhiteSpace(localRootOverride))
             {
                 storage.LocalRootPath = localRootOverride;
             }
 
-            var preferFileScheme = ReadConfigOrEnv("FileStorage:PreferFileLinks", "OPENFIRE_FILESTORAGE_PREFER_FILE");
+            var preferFileScheme = _configuration["FileStorage:PreferFileLinks"];
             if (!string.IsNullOrWhiteSpace(preferFileScheme) && bool.TryParse(preferFileScheme, out var preferFile))
             {
                 storage.PreferFileSchemeLinks = preferFile;
             }
 
-            var stripUploads = ReadConfigOrEnv("FileStorage:StripUploadsFromMapped", "OPENFIRE_FILESTORAGE_STRIP_UPLOADS");
+            var stripUploads = _configuration["FileStorage:StripUploadsFromMapped"];
             if (!string.IsNullOrWhiteSpace(stripUploads) && bool.TryParse(stripUploads, out var stripFlag))
             {
                 storage.StripUploadsFromMappedPath = stripFlag;
             }
-        }
-        private string? ReadConfigOrEnv(string configKey, string envKey)
-        {
-            var configValue = _configuration[configKey];
-            if (!string.IsNullOrWhiteSpace(configValue))
-            {
-                return configValue;
-            }
-
-            var envValue = Environment.GetEnvironmentVariable(envKey);
-            return string.IsNullOrWhiteSpace(envValue) ? null : envValue;
         }
         private static FileStoreType MapFileStoreType(FileStorageSettings storage)
         {

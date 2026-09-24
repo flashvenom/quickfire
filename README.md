@@ -1,114 +1,58 @@
-# Quickfire AMS (Openfire 1.1.1)
-![Quickfire](https://quickfireams.com/images/github/home-small.png)
+# Openfire — the public foundation of Quickfire
 
-## Primer
-Quickfire is an insurance agency management system for independent P&C brokers. Openfire is the open source edition, now fully refactored as of 1.1.1 for a cleaner architecture, faster iteration, and a stronger foundation for plugins and automation.
+Openfire is the public edition of Quickfire, an insurance agency management application built with ASP.NET Core 10, Blazor Server, Entity Framework Core, Fluent UI, and Syncfusion.
 
-[Take a Quick Video Tour](https://www.youtube.com/watch?v=ARkqg0iJG0g)
+The 1.2 foundation update focuses on a reproducible Windows web + SQLite installation, maintained dependencies, restartable database setup, and authenticated desktop helpers. Quickfire's commercial AI, integration, billing, and automation features are separate products.
 
-## Editions
-Openfire is the open source core framework of Quickfire and is focused on workflows. The fully featured, closed source builds for Mac (Desktop only) and Windows (Desktop and Server) are available now at https://quickfireams.com
+## Start the web application
 
-![Quickfire](https://quickfireams.com/images/github/qf-header2.png)
+Requirements: Windows, .NET SDK **10.0.401** (the repository allows servicing patches), and your own Syncfusion license for the components you use. MAUI, Office, SQL Server, and an OpenAI key are not prerequisites for the web build.
 
-## Scope
-- Track and manage clients, contacts, addresses, locations, policies, carriers, and more with a modern, fast UI
-- Consolidate your APIs to track payments, phone calls, leads, documents, and forms in one place
-- Use OpenAI integration to build custom prompts for data entry, summaries, and workflows
-- Centralize renewals, quotes, leads, and submissions with clear next actions
-- Assign tasks, set goal dates, and keep carrier and MGA notes organized
-- Store policy data (limits, rates, coverages) and include endorsements on certificates
-- Issue, store, and edit certificates, PDFs, and applications with a built-in editor
-- Talk to your data in natural language to unlock bleeding edge insights and time savers
-- Spawn background workers to handle follow ups, perform routine duties and more
+```powershell
+git clone https://github.com/flashvenom/Quickfire.git
+cd Quickfire
+Copy-Item src/Quickfire.Blazor/.env.example src/Quickfire.Blazor/.env
+```
 
-![Quickfire](https://quickfireams.com/images/github/renewals-small.png)
+Edit the new `.env` file. Set `ADMIN_PASSWORD` to a unique strong password and set `SYNCFUSION` to your license key. Keep the example SQLite connection for a local installation. The first account defaults to `admin@quickfire.local`; `ADMIN_EMAIL` and `ADMIN_USERNAME` can override it.
 
-## Loadout
-- **ASP.NET Core 10**
-- **Blazor (Server Side Interactivity)**
-- **Entity Framework Core**
-- **Microsoft FluentUI**
-- **SyncFusion Blazor**
-- **Outlook Interop**
-- **SQL Server and SQLite**
+```powershell
+dotnet tool restore
+dotnet restore Quickfire.Web.slnf
+dotnet build Quickfire.Web.slnf
+dotnet dev-certs https --trust
+dotnet run --project src/Quickfire.Blazor
+```
 
-![Quickfire](https://quickfireams.com/images/github/outreach-short-2.png)
+Open the HTTPS address printed by the application and sign in. SQLite migrations and baseline initialization run automatically. If the first password is missing or invalid, correct it and restart. There is no shared default password. Subsequent startup preserves existing accounts and passwords.
 
-## Triggerfinger
-**Ready, Aim, Fire...**
+The default database is `src/Quickfire.Blazor/local.db`. Configuration is loaded from `.env` beside the web project, independently of the launch working directory. Process environment variables override that file. Do not commit `.env`, databases, or uploaded documents.
 
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/flashvenom/Quickfire.git
-    cd Quickfire
-    ```
+See [Getting started](docs/wiki/Getting-Started.md) for configuration, upgrades, recovery, and storage details.
 
-2. **Run build-installer.bat to build a desktop/SQLite installation** or **set up your SQL Server database (optional):**
-    Create a `.env` file with your database connection string. Not providing a string will default the system to use a local SQLite database.
-    ```txt
-    DEFAULTCONNECTION={CONNECTIONSTRING}
-    ```
-    You must exclude either the Data/Migrations (SQL Server) or the Data/MigrationsLocal (SQLite) folder in your solution.
+## Verify a contribution
 
-3. **Enter a SyncFusion License Key and OpenAI API Secret:**
-    Register at syncfusion.com and get your free SyncFusion license key, then add your SyncFusion license and OpenAI secret to the .env file.
-    ```txt
-    SYNCFUSION={LICENSESTRING}
-    OPENAI={APIKEY}
-    ```
+```powershell
+./build/verify-web.ps1
+```
 
-4. **Apply migrations:**
-    ```bash
-    dotnet ef database update
-    ```
+This restores pinned tooling, audits direct and transitive dependencies, builds the web-only solution, runs isolated foundation tests, and checks the SQLite migration snapshot. It does not require MAUI or Office.
 
-5. **Run the application to seed initial data:**
-    ```bash
-    dotnet run
-    ```
+Run the [browser smoke suite](tests/Quickfire.BrowserTests/README.md) against a disposable published host to verify login, client editing, attachments and pairing. The **Licensed browser smoke** GitHub workflow is a separate release gate and requires the repository secret `QUICKFIRE_BROWSER_SYNCFUSION_LICENSE` (the earlier `OPENFIRE_BROWSER_SYNCFUSION_LICENSE` secret is also accepted).
 
-6. **Sign in with the default admin account (first run):**
-    ```txt
-    Username/Email: admin@quickfire.local
-    Password: Password123!
-    ```
-    Override seeded credentials with `.env` values if needed:
-    ```txt
-    ADMIN_EMAIL={EMAIL}
-    ADMIN_USERNAME={USERNAME}
-    ADMIN_PASSWORD={PASSWORD}
-    ```
+## Connect an optional Windows helper
 
+Sign in, open **Profile → Connected helpers**, and create an Office-helper or incoming-call credential. Enter its server URL and the one-time credential in the updated helper's connection settings. Select the Office helper that should execute commands; only one is active per account.
 
-## Latest Release
-### Openfire 1.1.1 (2026-02-07)
+Credentials expire after 90 days and can be revoked from Profile. Native helpers store them under the current Windows user using protected storage. Remote servers require trusted HTTPS; local desktop hosting can use actual loopback HTTP. Legacy anonymous helpers must be upgraded and paired; there is no compatibility bypass.
 
-Focused release: **Company Manual** and **Forms Library**.
+See [Helper connections](docs/wiki/guides/Helper-Connections.md). Office operations require the corresponding Windows application; the web quickstart does not.
 
-#### Company Manual
-New workflow for maintaining internal procedures with publishing controls.
+## Supported scope
 
-- Build structured manual content with nested pages and a table of contents
-- Author and update procedures in a rich text editor
-- Keep published revisions with change summaries and revision history
-- Allow non-admin users to submit suggested edits for admin approval/rejection
-- Search across published procedure titles and content
-- Track activity with an audit trail (publish, suggest, approve/reject, archive, restore, reorder)
-- Manage metadata like procedure type, line of business, owner, SLA target, and review dates
-- Print a single page or the full manual in a print-friendly layout
-- Support image/video embeds with lightbox viewing in the manual UI
+- **Foundation target:** Windows-hosted web application with SQLite.
+- **Optional helpers:** updated Windows Desktop, .NET Framework 4.8 Tray, and .NET 10 Call; helper protocol and native behavior have separate validation gates.
+- **Experimental:** SQL Server. This release does not apply SQLite migrations to SQL Server or supply a SQL Server migration chain.
+- Linux/container hosting, full installer qualification, and commercial Quickfire services are outside this release.
 
-#### Forms Library
-New centralized library for reusable PDF forms and version management.
-
-- Upload and catalog forms with metadata (carrier, wholesaler, market tag)
-- Filter and search by text, tags, archived state, bookmarks, and rating
-- Keep version history per form and set the active version
-- Auto-read PDF metadata (page count and form field count) for each version
-- Generate first-page thumbnails for quick visual preview
-- Open a form directly from the library
-- Attach a form to a client and open it in the Form Editor
-- Fill a form for a selected client in the Form Editor
-- Create an Outlook email draft with the selected form attached
-- Enforce PDF-only uploads with size validation (up to 200 MB)
+The repository retains its existing public client, contact, policy, renewal, form-library, and company-manual features. See [architecture](docs/wiki/System-Architecture.md), [contributing](CONTRIBUTING.md), and [license](LICENSE.md). Commercial Quickfire builds are available at [quickfireams.com](https://quickfireams.com).

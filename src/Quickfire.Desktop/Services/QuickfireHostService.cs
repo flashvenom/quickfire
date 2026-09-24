@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -180,7 +180,7 @@ namespace Quickfire.Desktop.Services
             startInfo.Environment["ASPNETCORE_URLS"] = _baseAddress.ToString();
             startInfo.Environment["DOTNET_ENVIRONMENT"] = environmentName;
             startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = environmentName;
-            startInfo.Environment["OPENFIRE_DESKTOP"] = "1";
+            startInfo.Environment["QUICKFIRE_DESKTOP"] = "1";
             ApplySetupConfiguration(startInfo, setupState);
 
             _logger.LogInformation("Starting Quickfire host from {WorkingDirectory} on {Url}", _contentRoot, _baseAddress);
@@ -203,11 +203,11 @@ namespace Quickfire.Desktop.Services
         private void ApplySetupConfiguration(ProcessStartInfo startInfo, DesktopSetupState setupState)
         {
             var dataDirectory = ResolveDataDirectory(setupState);
-            startInfo.Environment["OPENFIRE_DIR"] = dataDirectory;
+            startInfo.Environment["QUICKFIRE_DIR"] = dataDirectory;
 
             if (setupState.Database?.Mode == DesktopDatabaseMode.Remote)
             {
-                startInfo.Environment["OPENFIRE_DB"] = "SqlServer";
+                startInfo.Environment["QUICKFIRE_DB"] = "SqlServer";
                 var connection = setupState.Database.RemoteConnectionString;
                 if (!string.IsNullOrWhiteSpace(connection))
                 {
@@ -216,7 +216,7 @@ namespace Quickfire.Desktop.Services
             }
             else
             {
-                startInfo.Environment["OPENFIRE_DB"] = "Sqlite";
+                startInfo.Environment["QUICKFIRE_DB"] = "Sqlite";
                 var dbPath = setupState.Database?.LocalDatabasePath;
                 if (!string.IsNullOrWhiteSpace(dbPath))
                 {

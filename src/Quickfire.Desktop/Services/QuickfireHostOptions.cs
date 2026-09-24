@@ -4,6 +4,7 @@
     {
         public string AssetRoot { get; set; } = "QuickfireHost";
         public string ManifestFileName { get; set; } = "manifest.txt";
+        // Keep the existing desktop database and attachment location.
         public string DeploymentFolderName { get; set; } = "openfire-host";
         public string ContentFolderName { get; set; } = "site";
         public string DataDirectoryName { get; set; } = "data";

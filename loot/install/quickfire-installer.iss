@@ -1,5 +1,5 @@
 ﻿#define MyAppName "Openfire"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.2.0"
 #define MyAppPublisher "flashvenom"
 #define MyAppURL "https://www.quickfireams.com/"
 #define MyAppExeName "Quickfire.Desktop.exe"

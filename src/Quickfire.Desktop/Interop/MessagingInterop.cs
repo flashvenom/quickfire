@@ -15,8 +15,7 @@ public static class MessagingInterop
     {
         if (parameters is null || parameters.Count < 3)
         {
-            logger.LogWarning("ShowStaffChat skipped because not enough parameters were provided.");
-            return;
+            throw new ArgumentException("Staff notification parameters are incomplete.");
         }
 
         var senderName = parameters[0];
@@ -28,6 +27,7 @@ public static class MessagingInterop
             : $"Staff message from {senderFullName}";
 
         await NotificationInterop.ShowTrayNotificationAsync(new[] { title, $"{senderName}: {message}" }, logger, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         await BringWindowToFrontAsync(logger);
     }
 

@@ -1,32 +1,34 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using Quickfire.Shared.Bridge;
+using Quickfire.Blazor.Infrastructure.Bridge;
 
-namespace Quickfire.Blazor.Domain.Ember
+namespace Quickfire.Blazor.Domain.Ember;
+
+[Authorize(AuthenticationSchemes = BridgeAuthentication.SchemeName, Policy = BridgeAuthentication.OfficePolicy)]
+public sealed class EmberHub(BridgeHubGuard guard, BridgeConnections connections, BridgeDispatcher dispatcher) : Hub
 {
-    public class EmberHub : Hub
+    public override async Task OnConnectedAsync()
     {
-        // Method for clients to join a group based on user ID
-        public async Task JoinGroup(string userId)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, userId);
-        }
+        var device = await guard.RequireDeviceAsync(Context, BridgeScopes.Office);
+        connections.Register(new BridgeConnection(device.Id, device.UserId, Context.ConnectionId, Context.Abort));
+        await base.OnConnectedAsync();
+    }
 
-        // Send command to a specific user group
-        public async Task SendEmberCommand(string userId, string emberFunction, List<string> parameters)
-        {
-            Console.WriteLine($"Sending {userId} the command {emberFunction} with ({parameters.Count}) parameters.");
-            // Send ember command to the specific user's group
-            await Clients.Group(userId).SendAsync("ReceiveEmberCommand", emberFunction, parameters);
-            Console.WriteLine("Sent");
-        }
+    public async Task CompleteCommand(BridgeResponse response)
+    {
+        var device = await guard.RequireDeviceAsync(Context, BridgeScopes.Office);
+        await dispatcher.CompleteAsync(device, Context.ConnectionId, response);
+    }
 
-        // Handle responses from the Tray application and forward to clients
-        public async Task SendEmberResponse(string userId, string command, List<string> responseData)
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        if (Guid.TryParseExact(Context.User?.FindFirstValue(BridgeAuthentication.DeviceClaim), "N", out var deviceId))
         {
-            Console.WriteLine($"Received response from Tray for user {userId}, command {command}");
-            // Forward the response to all clients in the user's group
-            await Clients.Group(userId).SendAsync("ReceiveEmberResponse", userId, command, responseData);
+            connections.Remove(deviceId, Context.ConnectionId);
+            dispatcher.Disconnect(deviceId, Context.ConnectionId);
         }
+        return base.OnDisconnectedAsync(exception);
     }
 }

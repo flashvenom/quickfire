@@ -1,0 +1,10 @@
+{
+  "solution": {
+    "path": "Quickfire.sln",
+    "projects": [
+      "src\\Quickfire.Shared\\Quickfire.Shared.csproj",
+      "src\\Quickfire.Blazor\\Quickfire.Blazor.csproj",
+      "tests\\Quickfire.Founation.Tests\\Quickfire.Founation.Tests.csproj"
+    ]
+  }
+}

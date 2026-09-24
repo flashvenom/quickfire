@@ -15,8 +15,7 @@ public static class NotificationInterop
     {
         if (parameters is null || parameters.Count < 2)
         {
-            logger.LogWarning("ShowTrayNotification skipped because not enough parameters were provided.");
-            return;
+            throw new ArgumentException("A title and notification text are required.");
         }
 
         var title = parameters[0];
@@ -25,13 +24,14 @@ public static class NotificationInterop
 
         await MainThread.InvokeOnMainThreadAsync(async () =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 await Toast.Make(text, ToastDuration.Long).Show(cancellationToken);
             }
-            catch (Exception ex)
+            catch
             {
-                logger.LogWarning(ex, "Failed to display desktop toast notification.");
+                throw new InvalidOperationException("Unable to display the native notification.");
             }
         });
     }

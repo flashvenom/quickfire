@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -32,9 +32,7 @@ namespace Quickfire.Tray
                 case "OutlookEmail_CreateNew":
                     CreateNewEmail(parameters);
                     break;
-                default:
-                    SystemControl.Log($"Unknown ember function: {emberFunction}");
-                    break;
+                default: throw new NotSupportedException("Unsupported Outlook command.");
             }
         }
 
@@ -42,7 +40,6 @@ namespace Quickfire.Tray
         {
             try
             {
-                SystemControl.Log($"Performing Outlook email strict search for: {string.Join(", ", emailAddresses)}");
 
                 Microsoft.Office.Interop.Outlook.Application outlookApp = new Microsoft.Office.Interop.Outlook.Application();
                 NameSpace outlookNamespace = outlookApp.GetNamespace("MAPI");
@@ -56,24 +53,16 @@ namespace Quickfire.Tray
 
                     // Bring the Outlook window to the front
                     SystemControl.BringToFront("rctrl_renwnd32");
-                    SystemControl.Log("Search triggered and made Outlook window active");
                 }
-                else
-                {
-                    SystemControl.Log("Outlook is not running or no active Explorer window was found.");
-                }
+                else { throw new InvalidOperationException("Open classic Outlook before using this command."); }
             }
-            catch (System.Exception ex)
-            {
-                SystemControl.Log($"Error: {ex.Message}");
-            }
+            catch (System.Exception) { throw new InvalidOperationException("Classic Outlook could not complete the command."); }
         }
 
         public static void PerformOutlookSearch_EmailBroad(List<string> emailAddresses)
         {
             try
             {
-                SystemControl.Log($"Performing Outlook email broad search for: {string.Join(", ", emailAddresses)}");
 
                 Microsoft.Office.Interop.Outlook.Application outlookApp = new Microsoft.Office.Interop.Outlook.Application();
                 NameSpace outlookNamespace = outlookApp.GetNamespace("MAPI");
@@ -88,24 +77,16 @@ namespace Quickfire.Tray
 
                     // Bring the Outlook window to the front
                     SystemControl.BringToFront("rctrl_renwnd32");
-                    SystemControl.Log("Broad search triggered and made Outlook window active");
                 }
-                else
-                {
-                    SystemControl.Log("Outlook is not running or no active Explorer window was found.");
-                }
+                else { throw new InvalidOperationException("Open classic Outlook before using this command."); }
             }
-            catch (System.Exception ex)
-            {
-                SystemControl.Log($"Error: {ex.Message}");
-            }
+            catch (System.Exception) { throw new InvalidOperationException("Classic Outlook could not complete the command."); }
         }
 
         public static void PerformOutlookSearch_Policy(List<string> policies)
         {
             try
             {
-                SystemControl.Log($"Performing Outlook policy search for: {string.Join(", ", policies)}");
 
                 Microsoft.Office.Interop.Outlook.Application outlookApp = new Microsoft.Office.Interop.Outlook.Application();
                 NameSpace outlookNamespace = outlookApp.GetNamespace("MAPI");
@@ -119,24 +100,16 @@ namespace Quickfire.Tray
 
                     // Bring the Outlook window to the front
                     SystemControl.BringToFront("rctrl_renwnd32");
-                    SystemControl.Log("Policy search triggered and made Outlook window active");
                 }
-                else
-                {
-                    SystemControl.Log("Outlook is not running or no active Explorer window was found.");
-                }
+                else { throw new InvalidOperationException("Open classic Outlook before using this command."); }
             }
-            catch (System.Exception ex)
-            {
-                SystemControl.Log($"Error: {ex.Message}");
-            }
+            catch (System.Exception) { throw new InvalidOperationException("Classic Outlook could not complete the command."); }
         }
 
         public static void PerformOutlookSearch_SmartSearch(List<string> nameVariations)
         {
             try
             {
-                SystemControl.Log($"Performing Outlook Smart (Name) search for: {string.Join(", ", nameVariations)}");
 
                 Microsoft.Office.Interop.Outlook.Application outlookApp = new Microsoft.Office.Interop.Outlook.Application();
                 NameSpace outlookNamespace = outlookApp.GetNamespace("MAPI");
@@ -150,22 +123,15 @@ namespace Quickfire.Tray
 
                     // Bring the Outlook window to the front
                     SystemControl.BringToFront("rctrl_renwnd32");
-                    SystemControl.Log("Smart search triggered and made Outlook window active");
                 }
-                else
-                {
-                    SystemControl.Log("Outlook is not running or no active Explorer window was found.");
-                }
+                else { throw new InvalidOperationException("Open classic Outlook before using this command."); }
             }
-            catch (System.Exception ex)
-            {
-                SystemControl.Log($"Error: {ex.Message}");
-            }
+            catch (System.Exception) { throw new InvalidOperationException("Classic Outlook could not complete the command."); }
         }
 
         public static void PerformOutlookSearch_Carrier(List<string> parameters)
         {
-            SystemControl.Log("PerformOutlookSearch_Carrier method called.");
+            PerformOutlookSearch_SmartSearch(parameters);
         }
 
         public static void CreateNewEmail(List<string> parameters)
@@ -174,11 +140,8 @@ namespace Quickfire.Tray
             {
                 if (parameters == null || parameters.Count < 3)
                 {
-                    SystemControl.Log("Error: Insufficient parameters for creating new email. Required: To, Subject, Body");
-                    return;
+                    throw new ArgumentException("To, subject, and body are required.");
                 }
-
-                SystemControl.Log("Creating new email...");
 
                 Microsoft.Office.Interop.Outlook.Application outlookApp = new Microsoft.Office.Interop.Outlook.Application();
                 MailItem mailItem = (MailItem)outlookApp.CreateItem(OlItemType.olMailItem);
@@ -197,13 +160,8 @@ namespace Quickfire.Tray
 
                 // Bring Outlook window to front
                 SystemControl.BringToFront("rctrl_renwnd32");
-                
-                SystemControl.Log("New email created and displayed.");
             }
-            catch (System.Exception ex)
-            {
-                SystemControl.Log($"Error creating new email: {ex.Message}");
-            }
+            catch (System.Exception) { throw new InvalidOperationException("Classic Outlook could not complete the command."); }
         }
     }
 }

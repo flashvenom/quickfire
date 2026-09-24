@@ -17,13 +17,22 @@
         </Style>
     </ContentPage.Resources>
 
-    <Grid>
+    <Grid RowDefinitions="Auto,*">
+        <HorizontalStackLayout Padding="8" Spacing="12">
+            <Button Text="Pair helper" Clicked="OnPairHelperClicked" />
+            <Button Text="Forget helper" Clicked="OnForgetHelperClicked" />
+            <Button Text="Use local server" Clicked="OnUseLocalServerClicked" />
+            <Label x:Name="BridgeStatus" Text="Helper not paired" VerticalOptions="Center" />
+            <Label x:Name="ServerAddress" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+        </HorizontalStackLayout>
         <WebView x:Name="AppWebView"
+                 Grid.Row="1"
                  IsVisible="False"
                  HorizontalOptions="Fill"
                  VerticalOptions="Fill" />
 
         <Grid x:Name="LoadingOverlay"
+              Grid.Row="1"
               BackgroundColor="#F0F0F0"
               Opacity="0.96"
               HorizontalOptions="Fill"
@@ -47,6 +56,18 @@
                         BackgroundColor="#2563EB"
                         TextColor="White" />
             </StackLayout>
+        </Grid>
+        <Grid x:Name="PairingOverlay" Grid.RowSpan="2" IsVisible="False" BackgroundColor="#EEFFFFFF" Padding="24">
+            <VerticalStackLayout MaximumWidthRequest="520" VerticalOptions="Center" Spacing="12">
+                <Label Text="Pair this desktop helper" FontSize="22" />
+                <Label Text="Enter your server and choose Open server to sign in. Create an automation device credential in your Quickfire profile, then return here to save the pairing. Changing servers also changes this window." />
+                <Entry x:Name="PairingServer" Placeholder="https://quickfire.example" />
+                <Button Text="Open server" Clicked="OnOpenServerClicked" />
+                <Entry x:Name="PairingToken" Placeholder="Device credential" IsPassword="True" />
+                <Label x:Name="PairingError" TextColor="DarkRed" />
+                <Button Text="Save pairing" Clicked="OnSavePairingClicked" />
+                <Button Text="Cancel" Clicked="OnCancelPairingClicked" />
+            </VerticalStackLayout>
         </Grid>
     </Grid>
 

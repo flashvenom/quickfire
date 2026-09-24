@@ -1,10 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
+        <Version>1.2.0</Version>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>Quickfire.Blazor</RootNamespace>
+		<!-- Stable identifier for existing developer secrets, independent of project branding. -->
 		<UserSecretsId>aspnet-Quickfire-OpenFire-4d25c3cf-6f2d-47fa-a359-982211831511</UserSecretsId>
 		<ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
 		<PublishTrimmed>False</PublishTrimmed>
@@ -38,21 +40,21 @@
 		<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
 		<PackageReference Include="DotNetEnv" Version="3.1.1" />
 		<PackageReference Include="Docnet.Core" Version="2.6.0" />
-		<PackageReference Include="HtmlSanitizer" Version="9.1.891-beta" />
+		<PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
 		<PackageReference Include="itext7" Version="9.4.0" />
 		<PackageReference Include="itext7.bouncy-castle-adapter" Version="9.4.0" />
 		<PackageReference Include="Markdig" Version="0.44.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.12" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.12">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
@@ -75,8 +77,8 @@
 		<PackageReference Include="Syncfusion.DocIORenderer.Net.Core" Version="29.2.11" />
 		<PackageReference Include="Syncfusion.Pdf.Net.Core" Version="29.2.11" />
 		<PackageReference Include="Syncfusion.PdfToImageConverter.Net" Version="29.2.11" />
-		<PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
-		<PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+		<PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
+		<PackageReference Include="System.Drawing.Common" Version="10.0.12" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -96,4 +98,7 @@
 		<Copy SourceFiles="$(PublishDir)e_sqlite3.dll" DestinationFolder="$(_SqliteRuntimeDir)" SkipUnchangedFiles="true" Condition="Exists('$(PublishDir)e_sqlite3.dll')" />
 		<Copy SourceFiles="$(_SqliteVecSource)" DestinationFolder="$(_SqliteRuntimeDir)" SkipUnchangedFiles="true" Condition="Exists('$(_SqliteVecSource)')" />
 	</Target>
+  <ItemGroup>
+    <ProjectReference Include="../Quickfire.Shared/Quickfire.Shared.csproj" />
+  </ItemGroup>
 </Project>

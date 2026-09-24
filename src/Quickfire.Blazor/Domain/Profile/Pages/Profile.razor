@@ -13,6 +13,7 @@
 @inject SharedService SharedService
 @inject StateService StateService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <_Toolbar currentView="_Toolbar.ViewMode.Profile" />
 
@@ -254,6 +255,7 @@
                         </FluentCard>
                     </div>
                 </div>
+                <ConnectedHelpers />
             }
         </div>
     </div>
@@ -283,7 +285,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _user = await UserManager.GetUserAsync(SignInManager.Context.User);
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _user = await UserManager.GetUserAsync(authenticationState.User);
         if (_user != null)
         {
             _firstName = _user.FirstName;

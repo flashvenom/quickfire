@@ -146,6 +146,5 @@ public partial class BusinessDetailsEditorBase : ComponentBase
     public void Dispose()
     {
         CurrentJsonDocument?.Dispose();
-        EmberService?.DisposeAsync();
     }
 }

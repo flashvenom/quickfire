@@ -1,103 +1,96 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
-using System.IO;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.SignalR.Client;
+using Quickfire.Shared.Bridge;
+using System.Text;
 
-/// <summary>
-/// Simple exe that sends an incoming call notification to Surefire's SignalR hub.
-/// </summary>
-class SurefireCall
+internal static class SurefireCall
 {
-    private static readonly string LogFileName = "SurefireCall.log";
-    private static readonly string LogFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LogFileName);
-
-    static async Task Main(string[] args)
+    private static async Task<int> Main(string[] args)
     {
-        if (args.Length < 1)
+        if (!OperatingSystem.IsWindows())
         {
-            LogMessage("No caller ID provided. Exiting silently.");
-            return;
+            Console.Error.WriteLine("The incoming-call helper stores pairing with Windows account protection and requires Windows.");
+            return 1;
         }
-
-        string callerId = args[0]; // Phone number
-        string callerName = args.Length >= 2 ? args[1] : "Unknown Caller";
-        var callInfo = new CallInfo
+        string? credentialDirectory = null;
+        if (args.Length >= 2 && args[0] == "--credential-directory")
         {
-            CallerId = callerId,
-            CallerName = callerName
-        };
-
-        LogMessage($"Processing incoming call from {callerName} ({callerId})");
-
-        // Define the SignalR hub URLs
-        //"https://localhost:7074/notificationHub"
-        var hubUrls = new[]
-        {
-            "https://surefire.local/notificationHub"
-        };
-
-        // Create and start connections
-        var hubConnections = new List<HubConnection>();
-
-        foreach (var hubUrl in hubUrls)
-        {
-            try
-            {
-                var hubConnection = new HubConnectionBuilder()
-                    .WithUrl(hubUrl)
-                    .Build();
-
-                hubConnections.Add(hubConnection);
-                LogMessage($"Created connection to hub: {hubUrl}");
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error creating connection to {hubUrl}: {ex.Message}");
-            }
+            credentialDirectory = args[1];
+            args = args.Skip(2).ToArray();
         }
-
+        var store = new NativeCredentialStore("call", credentialDirectory);
         try
         {
-            // Start all connections asynchronously
-            var startTasks = hubConnections.Select(hubConnection => hubConnection.StartAsync());
-            await Task.WhenAll(startTasks);
-            LogMessage("All hub connections started successfully");
-
-            // Send the message to all hubs asynchronously
-            var sendTasks = hubConnections.Select(hubConnection => hubConnection.InvokeAsync("SendIncomingCall", callInfo));
-            await Task.WhenAll(sendTasks);
-            LogMessage("Call notification sent successfully to all hubs");
+            if (args.Length == 1 && args[0] == "--pair")
+            {
+                if (Console.IsInputRedirected) throw new InvalidOperationException();
+                Console.Write("Quickfire server origin: ");
+                var server = Console.ReadLine() ?? "";
+                Console.Write("Incoming-call device credential from your Quickfire profile: ");
+                var token = ReadSecret();
+                store.Save(server.Trim(), token.Trim());
+                Console.WriteLine("Pairing saved for this Windows account. No call was sent.");
+                return 0;
+            }
+            if (args.Length == 1 && args[0] == "--forget")
+            {
+                store.Forget();
+                Console.WriteLine("Pairing removed. Revoke the credential in Quickfire if it is no longer needed.");
+                return 0;
+            }
+            if (args.Length < 1 || args.Length > 2 || args[0].StartsWith("--", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(args[0]) || args[0].Length > 80 || (args.Length == 2 && args[1].Length > 200))
+            {
+                Console.Error.WriteLine("Usage: Quickfire.Call [--credential-directory <directory>] --pair | --forget | <caller-number> [caller-name]");
+                return 1;
+            }
+            var credential = store.Load();
+            if (credential == null)
+            {
+                Console.Error.WriteLine("Helper is not paired. Run Quickfire.Call --pair interactively first.");
+                return 1;
+            }
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            await using var connection = new HubConnectionBuilder()
+                .WithUrl(new Uri(credential.Origin, "notificationHub"), options =>
+                {
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(credential.Token);
+                    options.Transports = HttpTransportType.LongPolling;
+                    options.HttpMessageHandlerFactory = _ => new OriginBoundHandler(credential.Origin);
+                })
+                .Build();
+            await connection.StartAsync(timeout.Token);
+            // Intentionally one send, without reconnect/retry: an uncertain result must never duplicate a call.
+            await connection.InvokeAsync("SendIncomingCall", new CallInfo
+            {
+                CallerId = args[0], CallerName = args.Length == 2 ? args[1] : "Unknown Caller"
+            }, timeout.Token);
+            Console.WriteLine("Call notification accepted.");
+            return 0;
         }
-        catch (Exception ex)
+        catch
         {
-            LogMessage($"Error during hub operations: {ex.Message}");
-        }
-        finally
-        {
-            // Dispose all connections
-            var disposeTasks = hubConnections.Select(hubConnection => hubConnection.DisposeAsync().AsTask());
-            await Task.WhenAll(disposeTasks);
-            LogMessage("All connections disposed");
+            Console.Error.WriteLine("The helper could not complete the operation. Check the server, HTTPS certificate, and pairing in Quickfire. The notification was not retried.");
+            return 1;
         }
     }
 
-    private static void LogMessage(string message)
+    private static string ReadSecret()
     {
-        try
+        var value = new StringBuilder();
+        while (true)
         {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var logMessage = $"[{timestamp}] {message}{Environment.NewLine}";
-            File.AppendAllText(LogFilePath, logMessage);
-        }
-        catch (Exception ex)
-        {
-            // If logging fails, write to console as fallback
-            Console.WriteLine($"Failed to write to log file: {ex.Message}");
-            Console.WriteLine($"Original message: {message}");
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter) { Console.WriteLine(); return value.ToString(); }
+            if (key.Key == ConsoleKey.Escape) throw new OperationCanceledException();
+            if (key.Key == ConsoleKey.Backspace) { if (value.Length > 0) value.Length--; }
+            else if (!char.IsControl(key.KeyChar) && value.Length < 1024) value.Append(key.KeyChar);
         }
     }
 }
 
-public class CallInfo
+public sealed class CallInfo
 {
-    public string CallerId { get; set; }
-    public string CallerName { get; set; }
+    public string CallerId { get; set; } = "";
+    public string CallerName { get; set; } = "";
 }

@@ -1,0 +1,173 @@
+@namespace Quickfire.Blazor.Domain.Profile.Components
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Quickfire.Blazor.Infrastructure.Bridge
+@implements IDisposable
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject BridgeDevices BridgeDevices
+@inject NavigationManager NavigationManager
+
+<section class="connected-helpers" aria-labelledby="connected-helpers-title">
+    <h4 id="connected-helpers-title">Connected helpers</h4>
+    <p>Connect a desktop helper for Office and local file actions, or a call helper for your incoming-call notifications. Each helper belongs to your account.</p>
+    <div class="helper-form">
+        <label>Helper name <input @bind="label" @bind:event="oninput" maxlength="80" disabled="@busy" placeholder="For example, my work computer" /></label>
+        <label>Purpose
+            <select @bind="scope" disabled="@busy">
+                <option value="@BridgeScopes.Office">Office and local files</option>
+                <option value="@BridgeScopes.IncomingCall">Incoming calls</option>
+            </select>
+        </label>
+        <button type="button" disabled="@(busy || string.IsNullOrWhiteSpace(label) || issuedCredential != null)" @onclick="IssueAsync">Create helper key</button>
+    </div>
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <p role="status">@message</p>
+    }
+    @if (issuedCredential != null)
+    {
+        <div class="helper-credential" role="status">
+            <strong>Save this key now. It will not be shown again.</strong>
+            <p>Enter this server address and key in the helper's connection settings. Keep the key private.</p>
+            <label>Server address <input readonly value="@NavigationManager.BaseUri" /></label>
+            <label>Helper key <textarea readonly rows="3" spellcheck="false" autocomplete="off">@issuedCredential</textarea></label>
+            <button type="button" @onclick="ForgetCredential">I've saved the key</button>
+        </div>
+    }
+    @if (devices.Count == 0)
+    {
+        <p>No helper keys have been created yet. You can continue using Quickfire in your browser.</p>
+    }
+    else
+    {
+        <ul class="helper-list">
+            @foreach (var device in devices)
+            {
+                var inactive = device.RevokedUtc != null || device.ExpiresUtc <= DateTime.UtcNow;
+                <li @key="device.Id">
+                    <div>
+                        <strong>@device.Label</strong>
+                        <span>@(device.Scope == BridgeScopes.Office ? "Office and local files" : "Incoming calls")</span>
+                        <span>@(device.RevokedUtc != null ? "Revoked" : inactive ? "Expired" : device.IsSelected ? "Selected for Office actions" : "Key active") · Expires @device.ExpiresUtc.ToLocalTime().ToString("g")</span>
+                    </div>
+                    <div class="helper-actions">
+                        @if (!inactive && device.Scope == BridgeScopes.Office && !device.IsSelected)
+                        {
+                            <button type="button" disabled="@busy" @onclick="() => SelectAsync(device.Id)">Use for Office actions</button>
+                        }
+                        @if (!inactive)
+                        {
+                            <button type="button" disabled="@busy" @onclick="() => RevokeAsync(device.Id)">Revoke</button>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+    <p class="helper-note">Only the selected Office helper receives desktop actions. Keys expire after 90 days. Revoke a key here when a computer or helper should no longer have access.</p>
+</section>
+
+@code {
+    private List<BridgeDevice> devices = [];
+    private string label = string.Empty;
+    private string scope = BridgeScopes.Office;
+    private string? issuedCredential;
+    private Guid? issuedDeviceId;
+    private string? message;
+    private bool busy;
+    private bool disposed;
+    private int authenticationRevision;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        await RunAsync(async user => devices = await BridgeDevices.ListAsync(user));
+    }
+
+    private async Task IssueAsync() => await RunAsync(async user =>
+    {
+        if (string.IsNullOrWhiteSpace(label) || issuedCredential != null)
+            return;
+        var issued = await BridgeDevices.IssueAsync(user, label.Trim(), scope);
+        issuedCredential = issued.Credential;
+        issuedDeviceId = issued.Device.Id;
+        label = string.Empty;
+        devices = await BridgeDevices.ListAsync(user);
+        message = "Helper key created. Configure your helper using the details below.";
+    });
+
+    private async Task SelectAsync(Guid deviceId) => await RunAsync(async user =>
+    {
+        await BridgeDevices.SelectAsync(user, deviceId);
+        devices = await BridgeDevices.ListAsync(user);
+        message = "Office actions will now use the selected helper.";
+    });
+
+    private async Task RevokeAsync(Guid deviceId) => await RunAsync(async user =>
+    {
+        await BridgeDevices.RevokeAsync(user, deviceId);
+        if (issuedDeviceId == deviceId)
+            ForgetCredential();
+        devices = await BridgeDevices.ListAsync(user);
+        message = "The helper key has been revoked.";
+    });
+
+    private async Task RunAsync(Func<ClaimsPrincipal, Task> action)
+    {
+        if (busy || disposed)
+            return;
+        busy = true;
+        var revision = authenticationRevision;
+        message = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (state.User.Identity?.IsAuthenticated != true)
+            {
+                ForgetCredential();
+                devices.Clear();
+                message = "Sign in to manage your connected helpers.";
+                return;
+            }
+            await action(state.User);
+        }
+        catch
+        {
+            message = "Unable to update your connected helpers. Sign in again or try again shortly.";
+        }
+        finally
+        {
+            if (disposed || revision != authenticationRevision)
+            {
+                ForgetCredential();
+                devices.Clear();
+            }
+            busy = false;
+        }
+    }
+
+    private void ForgetCredential()
+    {
+        issuedCredential = null;
+        issuedDeviceId = null;
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> stateTask)
+    {
+        authenticationRevision++;
+        try
+        {
+            await stateTask;
+            if (!disposed)
+                await InvokeAsync(() => { ForgetCredential(); devices.Clear(); StateHasChanged(); });
+        }
+        catch { /* A closing circuit must not retain or redisplay a helper key. */ }
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        ForgetCredential();
+    }
+}

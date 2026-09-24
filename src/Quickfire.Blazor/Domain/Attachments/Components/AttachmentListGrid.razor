@@ -65,7 +65,7 @@
                 <ChildContent>
                     @if (context is Attachment a)
                     {
-                        <div class="row-actions">
+                        <div class="row-actions" @onclick:stopPropagation="true">
                             <FluentButton Appearance="Appearance.Stealth" Title="Preview" OnClick="@(async _ => await OpenPreviewAsync(a))">
                                 <FluentIcon Value="@(new Icons.Regular.Size20.Document())" />
                             </FluentButton>

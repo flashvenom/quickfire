@@ -518,11 +518,11 @@
         return "Our Client";
     }
 
-    private async Task SendEmailForCarrier(string carrierName, List<Policy> policies)
+    private async Task<bool> SendEmailForCarrier(string carrierName, List<Policy> policies)
     {
         if (policies == null || !policies.Any())
         {
-            return;
+            return false;
         }
 
         // Get a representative policy to use in the subject
@@ -558,15 +558,16 @@
         try 
         {
             // Create the email using Ember service
-            await CreateNewEmail(toEmail, subject, body);
-            
-            // Show success toast
-            ToastService.ShowSuccess($"Email created successfully for {carrierName}!");
+            if (!await CreateNewEmail(toEmail, subject, body))
+                return false;
+            ToastService.ShowSuccess($"Email draft created in Outlook for {carrierName}.");
+            return true;
         }
         catch (Exception ex)
         {
             ToastService.ShowError($"Error creating email for {carrierName}: {ex.Message}");
             Console.WriteLine($"Error in SendEmailForCarrier: {ex}");
+            return false;
         }
     }
 
@@ -584,8 +585,8 @@
         {
             try
             {
-                await SendEmailForCarrier(carrierGroup.Key, carrierGroup.Value);
-                successCount++;
+                if (await SendEmailForCarrier(carrierGroup.Key, carrierGroup.Value))
+                    successCount++;
             }
             catch (Exception ex)
             {
@@ -599,7 +600,7 @@
         }
         else
         {
-            ToastService.ShowWarning($"Created {successCount} out of {totalCount} emails. Check the console for details.");
+            ToastService.ShowWarning($"Created {successCount} out of {totalCount} email drafts. Check your connected helper before retrying.");
         }
     }
 
@@ -629,10 +630,10 @@
         return string.Empty;
     }
     
-    private async Task CreateNewEmail(string toEmail, string subject, string body)
+    private async Task<bool> CreateNewEmail(string toEmail, string subject, string body)
     {
         var parameters = new List<string> { toEmail, subject, body };
-        await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters);
+        return await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters);
     }
 
     // Add a method to generate a mailto: link for fallback email

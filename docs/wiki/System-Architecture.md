@@ -1,36 +1,34 @@
-﻿This overview covers the projects that ship in the open-source solution and highlights the services/components referenced throughout the wiki.
+# Openfire architecture
 
-## Solution Layout
-| Project | Purpose | Key folders |
-| --- | --- | --- |
-| `src/Quickfire.Blazor` (`Quickfire.Blazor.csproj`) | Blazor Server host, REST endpoints, SignalR hubs | `Domain/*` feature areas, `Data` EF Core context/migrations, `App/Layout`, `wwwroot` assets |
-| `src/Quickfire.Desktop` (`Quickfire.Desktop.csproj`) | .NET MAUI shell that boots the published Blazor host locally | `Services/QuickfireHostService.cs`, `Resources`, `appsettings.maui.json` |
-| `src/Quickfire.Tray` (`Quickfire.Tray.csproj`) | Windows tray helper for Outlook, Word, and OS commands | `System`, `Methods`, `Resources` |
+Openfire's public application remains a Blazor Server application organized by feature under `src/Quickfire.Blazor/Domain`. The foundation update does not introduce a new application framework or import private Quickfire services.
 
-## Runtime Modes
-- **Server/Web** - Standard ASP.NET Core host. SQLite by default, SQL Server when `DEFAULTCONNECTION` is provided.
-- **Desktop** - MAUI shell runs the host locally. Runtime detection uses `OPENFIRE_DESKTOP` or `OPENFIRE_DIR`.
-- **Tray (optional)** - Separate process that connects to `/emberHub` for Outlook/Word and desktop commands.
+## Projects
 
-## Core Services
-- **StateService** (`src/Quickfire.Blazor/Domain/Shared/Services/StateService.cs`) caches lookups and user preferences and drives status bar updates.
-- **SearchService** (`src/Quickfire.Blazor/Domain/Shared/Services/SearchService.cs`) powers FireSearch across clients, carriers, contacts, policies, renewals, and leads.
-- **AttachmentService** (`src/Quickfire.Blazor/Domain/Attachments/Services/AttachmentService.cs`) handles uploads, hashing, thumbnails, and local storage under `wwwroot/uploads`.
-- **EmberService + EmberHub** (`src/Quickfire.Blazor/Domain/Ember/*`) forward tray commands and responses.
+| Project | Responsibility |
+| --- | --- |
+| Quickfire.Blazor | ASP.NET Core host, Identity accounts, public workflows, EF Core data, authenticated helper hubs |
+| Quickfire.Shared | Reusable class library; its `Bridge` folder holds helper protocol, origin/path validation and Windows credential protection, compatible with the .NET Framework 4.8 Tray helper |
+| Quickfire.Founation.Tests | Disposable SQLite, bootstrap, authentication, routing, and helper-safety checks |
+| Quickfire.Desktop | Windows MAUI shell and optional Office helper |
+| Quickfire.Tray | .NET Framework 4.8 Office/Windows helper |
+| Quickfire.Call | .NET 10 incoming-call publisher |
 
-## Data and Storage
-- EF Core context lives in `src/Quickfire.Blazor/Data/ApplicationDbContext*.cs`.
-- Migrations live in `src/Quickfire.Blazor/Data/Migrations`.
-- Attachments store metadata in the database and files on disk (default `wwwroot/uploads`).
+`Quickfire.Web.slnf` selects the web application, shared library and foundation tests. `Quickfire.sln` retains native projects. Call is also built explicitly by CI. Consumers reference `Quickfire.Shared` as a project; shared source files are not linked separately into each executable. Tray remains an executable rather than a dependency of the web host.
 
-## Request Lifecycles
-1. **UI** - Razor components (e.g., `Domain/Clients/Pages/Clients.razor`) use Fluent UI + Syncfusion controls wired with conventions in [[reference/Binding-Events]].
-2. **Services** - Domain services live under `Domain/*/Services` and depend on `ApplicationDbContext`, `StateService`, and helpers.
-3. **Desktop Loop** - MAUI host unpacks `build/desktop`, boots `Quickfire.Blazor.exe`, and points the WebView at the local port.
+## Startup and data
 
-## Observability
-- `StateService.UpdateStatus("...", isBusy)` feeds the status bar (`src/Quickfire.Blazor/App/Layout/_statusbar.razor`).
-- `ILoggingService` and `ILogger` provide structured logs in services.
-- `Quickfire.Tray/System/SystemTray.cs` writes to `%LOCALAPPDATA%\Surefire\TrayLog.txt` for tray diagnostics.
+`Infrastructure/Foundation` loads project-local configuration, resolves the provider, and initializes SQLite. `Data/ApplicationDbContextFactory.cs` gives EF tooling a design-time path independent of web startup. Historical migrations remain under `Migrations`; new migrations extend that chain. SQL Server selection remains explicit and experimental; SQLite migrations are never used to bootstrap SQL Server.
 
-Keep this page handy when updating docs: cite the relevant file paths from this map so engineers can jump from wiki to code immediately.
+An initial administrator requires an explicitly supplied password. Initialization is idempotent and restartable. New storage defaults use the actual web content directory; existing database and attachment locations are preserved.
+
+## Helper connections
+
+Profile manages credentials tied to immutable Identity user IDs. Credentials are scoped to Office execution or incoming-call publication, hashed server-side, expire after 90 days, and can be revoked. The web application dispatches commands directly through authenticated server services; it does not open anonymous SignalR connections back to itself.
+
+`/emberHub` accepts paired Office helpers and correlated responses. `/notificationHub` accepts paired call publishers and delivers calls only to the credential owner. User-selected usernames and arbitrary group joins are not authorization. The selected Office helper receives each command once, and results must match its outstanding request. Revocation, expiry, and account security-state changes invalidate active use.
+
+The Blazor interactive-server circuit is separate from these helper hubs. An unpaired/offline helper cannot prevent browser startup. UI actions report actual helper results instead of claiming success after failed dispatch.
+
+## Compatibility
+
+This is a single-host Windows + SQLite foundation. Helper protocol updates must ship with their server counterpart. Scale-out hosting, SQL Server migrations, Linux PDF-rendering compatibility, and installer qualification require separate work.

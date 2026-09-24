@@ -5,6 +5,7 @@
 
 @using Quickfire.Blazor.Components.Account.Shared
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using Quickfire.Blazor.Data
@@ -85,8 +86,17 @@
 
         if (HttpContext.User.Identity?.IsAuthenticated == true)
         {
-            RedirectManager.RedirectTo(ReturnUrl);
-            return;
+            var user = await SignInManager.UserManager.GetUserAsync(HttpContext.User);
+            if (user is not null)
+            {
+                RedirectManager.RedirectTo(ReturnUrl);
+                return;
+            }
+
+            // A valid cookie can outlive its account. Clear it before rendering
+            // the anonymous login form, including its antiforgery token.
+            await SignInManager.SignOutAsync();
+            HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
         }
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))

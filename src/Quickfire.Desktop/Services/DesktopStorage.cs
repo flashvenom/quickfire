@@ -7,6 +7,7 @@ namespace Quickfire.Desktop.Services;
 public static class DesktopStorage
 {
     private const string CompanyFolder = "flashvenom";
+    // Existing installations store their database and attachments under these names.
     private const string ProductFolder = "openfire";
     private const string DefaultHostFolder = "openfire-host";
 

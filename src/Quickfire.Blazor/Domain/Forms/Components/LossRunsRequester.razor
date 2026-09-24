@@ -365,10 +365,8 @@
         try 
         {
             // Create the email using Ember service
-            await CreateNewEmail(toEmail, subject, body);
-            
-            // Show success toast
-            ToastService.ShowSuccess("Email created successfully!");
+            if (await CreateNewEmail(toEmail, subject, body))
+                ToastService.ShowSuccess("Email draft created in Outlook.");
         }
         catch (Exception ex)
         {
@@ -377,10 +375,10 @@
         }
     }
     
-    private async Task CreateNewEmail(string toEmail, string subject, string body)
+    private async Task<bool> CreateNewEmail(string toEmail, string subject, string body)
     {
         var parameters = new List<string> { toEmail, subject, body };
-        await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters);
+        return await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters);
     }
 
     // Add a method to generate a mailto: link for fallback email

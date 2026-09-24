@@ -1,0 +1,29 @@
+name: Web foundation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore, audit, build and test web foundation
+        shell: pwsh
+        run: ./build/verify-web.ps1
+      - name: Build incoming-call helper
+        shell: pwsh
+        run: |
+          dotnet restore src/Quickfire.Call/Quickfire.Call.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1901%3BNU1902%3BNU1903%3BNU1904%3BNU1905'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet build src/Quickfire.Call/Quickfire.Call.csproj -c Release --no-restore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundation-test-results
+          path: artifacts/test-results
+          if-no-files-found: ignore

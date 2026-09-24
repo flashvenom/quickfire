@@ -9,11 +9,10 @@
 @inject StateService StateService
 
 
-<div class="daily-container">
-    @if (StateService.CurrentUser is { } currentUser)
-    {
+@if (StateService.CurrentUser is { } currentUser)
+{
+    <div class="daily-container">
         <div class="sectiontitletab">Welcome back to Quickfire, @currentUser.FirstName!</div>
-    }
     <div class="dailytask-box">
         <div class="add-field">
             <FluentTextField Id="newTaskInput" Placeholder="Add a new to-do item..." @bind-Value="newTaskName" @onkeyup="OnKeyUp" Style="width:100% !important;">
@@ -60,6 +59,7 @@
         }
     </div>
 </div>
+}
 
 <style>
     .completed-task {

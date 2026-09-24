@@ -602,19 +602,6 @@
         await LoadClientsAsync();
         await LoadCarriersAndWholesalersAsync();
         await RefreshLibraryAsync();
-        await StartEmberAsync();
-    }
-
-    private async Task StartEmberAsync()
-    {
-        try
-        {
-            await EmberService.StartConnectionAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to start EmberService: {ex.Message}");
-        }
     }
 
     private async Task LoadClientsAsync()
@@ -1130,9 +1117,11 @@
             parameters.Add(attachmentPath);
         }
 
-        await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters);
-        emailDialogHidden = true;
-        ToastService.ShowSuccess("Email draft created in Outlook.");
+        if (await EmberService.RunEmberFunction("OutlookEmail_CreateNew", parameters))
+        {
+            emailDialogHidden = true;
+            ToastService.ShowSuccess("Email draft created in Outlook.");
+        }
     }
 
     private async Task AttachAndOpenFormAsync()
@@ -1544,10 +1533,10 @@
         return string.IsNullOrWhiteSpace(cleaned) ? "library-form" : cleaned;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         searchDebounceCts?.Cancel();
         searchDebounceCts?.Dispose();
-        await EmberService.DisposeAsync();
+        return ValueTask.CompletedTask;
     }
 }

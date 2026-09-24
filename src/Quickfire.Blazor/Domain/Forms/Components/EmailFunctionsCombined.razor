@@ -116,7 +116,7 @@
                 else
                 {
                     <FluentStack>
-                        <div class="btn-compose" onclick="@SendOutlookEmail">
+                        <div class="btn-compose" @onclick="SendOutlookEmail">
                             <FluentIcon Value="@(new Icons.Regular.Size32.MailEdit())" Color="Color.Custom" CustomColor="#4c4c4c;" /><br />
                             Draft
                         </div>
@@ -272,12 +272,12 @@
             .OrderBy(o => GetOptionName(o))
             .ToList();
     }
-    private void SendOutlookEmail()
+    private async Task SendOutlookEmail()
     {
         string toEmail = GetContactEmail(selectedContact);
         string subject = GetProcessedSubject();
         string body = GetProcessedBody();
-        _ = OutlookNewEmail(toEmail, subject, body);
+        await OutlookNewEmail(toEmail, subject, body);
     }
     private string GetOptionName(object option)
     {
@@ -903,8 +903,8 @@
         if (toEmail != null && subject != null && body != null)
         {
             var myParams = new List<string> { toEmail, subject, body };
-            await EmberService.RunEmberFunction("OutlookEmail_CreateNew", myParams);
-            ToastService.ShowSuccess("Email created successfully!");
+            if (await EmberService.RunEmberFunction("OutlookEmail_CreateNew", myParams))
+                ToastService.ShowSuccess("Email draft created in Outlook.");
         }
     }
 }

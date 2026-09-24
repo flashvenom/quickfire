@@ -1,5 +1,6 @@
-﻿#region Usings Statements
-using DotNetEnv;
+#region Usings Statements
+using Quickfire.Blazor.Infrastructure.Foundation;
+using Quickfire.Blazor.Infrastructure.Bridge;
 using Quickfire.Blazor.Data;
 using Quickfire.Blazor.Domain.Attachments.Services;
 using Quickfire.Blazor.Domain.Carriers.Services;
@@ -27,27 +28,26 @@ using Syncfusion.Blazor;
 using Quickfire.Blazor.Infrastructure.Desktop;
 #endregion
 
-EnsureDesktopEnvironment();
 
 // INITIAL VARIABLES -- -- -- -   -     -     -                -           -              -            -   -       -  -   -  - -  ---  -  -   -      -         -    -          -             /
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = QuickfireConfiguration.CreateBuilder(args);
 builder.WebHost.UseStaticWebAssets();
 
 bool environmentSaysDesktop = builder.Environment.IsEnvironment("Desktop");
-bool desktopMarkersPresent = string.Equals(Environment.GetEnvironmentVariable("OPENFIRE_DESKTOP"), "1", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENFIRE_DIR"));
+bool desktopMarkersPresent = string.Equals(builder.Configuration["QUICKFIRE_DESKTOP"], "1", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(builder.Configuration["QUICKFIRE_DIR"]);
 var contentRoot = builder.Environment.ContentRootPath ?? string.Empty;
 bool runningFromDesktopOutput = contentRoot.Contains("\\build\\desktop\\", StringComparison.OrdinalIgnoreCase) || contentRoot.Contains("/build/desktop/", StringComparison.OrdinalIgnoreCase);
 bool isDesktopRuntime = environmentSaysDesktop || desktopMarkersPresent || runningFromDesktopOutput;
-if (isDesktopRuntime && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENFIRE_DIR")))
+if (isDesktopRuntime && string.IsNullOrWhiteSpace(builder.Configuration["QUICKFIRE_DIR"]))
 {
-    Environment.SetEnvironmentVariable("OPENFIRE_DIR", ResolveDesktopDataDirectory());
+    builder.Configuration["QUICKFIRE_DIR"] = ResolveDesktopDataDirectory();
 }
-DesktopAdminOptions desktopAdminOptions = BuildDesktopAdminOptions();
 builder.Services.AddHttpClient();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddMemoryCache();
 builder.Services.AddControllers();
-Env.NoClobber().Load(Path.Combine(builder.Environment.ContentRootPath, ".env"));
+// Project-local .env was loaded by the configuration factory before settings were read.
+// It never changes process environment values, preserving the deployment-first behavior of PR #15.
 bool detailedErrorsEnabled = builder.Configuration.GetValue<bool>("DetailedErrors:Enabled");
 
 // IDEN AND AUTH -- -- -- -   -     -     -      -             -           -            -           -   -      -  -   -  --  ---  ---  -   -      -         -    -      -  -        idenauth/
@@ -60,46 +60,14 @@ builder.Services.AddAuthentication(options => { options.DefaultScheme = Identity
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true).AddEntityFrameworkStores<ApplicationDbContext>().AddSignInManager().AddDefaultTokenProviders();
  
 // DATABASE  -- -- -- -   -     -     -      -             -           -            -            -   -      -  -   -  --  ---  -  -  -   -      -         -    -             -      database/
-// Get connection string from config (environment variable can override for advanced scenarios, but not required)
-string? configuredConnection = Environment.GetEnvironmentVariable("DEFAULTCONNECTION");
-configuredConnection ??= builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=local.db";
-
-// Get provider preference from config (environment variable can override for advanced scenarios, but not required)
-string providerPreference = Environment.GetEnvironmentVariable("OPENFIRE_DB") ?? builder.Configuration["Database:Provider"] ?? (isDesktopRuntime ? "Sqlite" : "SqlServer");
-bool useSqlite = string.Equals(providerPreference, "Sqlite", StringComparison.OrdinalIgnoreCase);
-bool useSqlServer = string.Equals(providerPreference, "SqlServer", StringComparison.OrdinalIgnoreCase);
-
-if (useSqlServer)
+var databaseConfiguration = DatabaseConfiguration.Resolve(builder.Configuration, builder.Environment.ContentRootPath);
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
-    // Use SQL Server - connection string from DefaultConnection
-    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    {
-        options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
-        options.UseSqlServer(configuredConnection, sqlOptions =>
-        {
-            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-            sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-            sqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name);
-        });
-    });
-}
-else
-{
-    // Use SQLite (default) - connection string from DefaultConnection
-    var sqliteConnection = PrepareSqliteConnectionString(
-        configuredConnection, 
-        Environment.GetEnvironmentVariable("OPENFIRE_DIR"),
-        builder.Environment.ContentRootPath);
-
-    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    {
-        options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
-        options.UseSqlite(sqliteConnection, sqliteOptions =>
-        {
-            sqliteOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name);
-        });
-    });
-}
+    if (databaseConfiguration.IsSqlite)
+        options.UseSqlite(databaseConfiguration.ConnectionString);
+    else
+        options.UseSqlServer(databaseConfiguration.ConnectionString, sql => sql.EnableRetryOnFailure());
+});
 
 builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
@@ -107,11 +75,9 @@ builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<Applica
 builder.Services.AddSyncfusionBlazor();
 builder.Services.AddFluentUIComponents();
 builder.Services.AddDataGridEntityFrameworkAdapter();
-string? syncfusionLicense = Environment.GetEnvironmentVariable("SYNCFUSION");
+var syncfusionLicense = builder.Configuration["Syncfusion:LicenseKey"];
 if (!string.IsNullOrWhiteSpace(syncfusionLicense))
-{
     Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(syncfusionLicense);
-}
 
 // DEPENDENCIES -- -- -- -   -     -      -                -           -              -            -   -       -  -   -  - -  ---  --  -   -      -         -    -          -      injections/
 builder.Services.AddScoped<AttachmentService>();
@@ -155,8 +121,8 @@ builder.Services.AddSignalR(hubOptions =>
 
 // Misc -- -- -- -   -     - -- -- -- -   -  -     -            -                -            -   -       -  -   -  - -  ---  - -  -   -      -         -    -          -        -       misc/
 builder.Services.AddHttpContextAccessor();
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true).AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true).AddEnvironmentVariables();
 builder.Services.AddServerSideBlazor().AddHubOptions(o => { o.MaximumReceiveMessageSize = 102400000; });
+builder.Services.AddQuickfireBridge();
 
 
 // ------------------------------------------------------- -- -   -  -     -                                              
@@ -178,7 +144,7 @@ else
     app.UseDeveloperExceptionPage();
 }
 
-app.UseMigrationsEndPoint();
+if (app.Environment.IsDevelopment()) app.UseMigrationsEndPoint();
 app.MapStaticAssets();
 // Configure static files that cache for 24 hours
 app.UseDefaultFiles();
@@ -193,193 +159,16 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 // Final config settings
-app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapHub<NotificationHub>("/notificationHub");
-app.MapHub<EmberHub>("/emberHub");
+app.UseAntiforgery();
+app.MapQuickfireBridge();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapAdditionalIdentityEndpoints();
 app.MapControllers();
 
-await InitializeDatabaseIfFirstRunAsync(app.Services, app.Logger);
-
-// Optional baseline seed for the Blazor server app when explicitly requested
-if (ReadEnvFlag("OPENFIRE_SEED"))
-{
-    app.Logger.LogInformation("OPENFIRE_SEED detected; running baseline seed (admin, products, settings).");
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        SeedInitialData.SeedData(scope.ServiceProvider);
-        app.Logger.LogInformation("Baseline seed completed.");
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Baseline seed failed.");
-        throw;
-    }
-}
-
-if (isDesktopRuntime)
-{
-    await DesktopRuntimeInitializer.InitializeAsync(
-        app.Services,
-        new DesktopRuntimeOptions
-        {
-            Admin = desktopAdminOptions
-        },
-        app.Logger);
-}
-
-// -- -- -- -   -  -     -            -                -            -   -       -  -   -  - -  ---  - -  -   -      -         -    -          -        -          -              -         /
-
+await DatabaseInitializer.InitializeAsync(app.Services);
 app.Run();
-
-static void EnsureDesktopEnvironment()
-{
-    var hasDesktopMarker =
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENFIRE_DESKTOP")) ||
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENFIRE_DIR"));
-
-    if (hasDesktopMarker)
-    {
-        ForceEnvironment("Desktop");
-    }
-}
-
-static void ForceEnvironment(string environmentName)
-{
-    Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", environmentName);
-    Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", environmentName);
-}
-
-static DesktopAdminOptions BuildDesktopAdminOptions()
-{
-    var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-    return new DesktopAdminOptions
-    {
-        Email = ReadEnvOrDefault("ADMIN_EMAIL", "admin@quickfire.local"),
-        UserName = ReadEnvOrDefault("ADMIN_USERNAME", "admin@quickfire.local"),
-        FirstName = ReadEnvOrDefault("ADMIN_FIRSTNAME", "Quickfire"),
-        LastName = ReadEnvOrDefault("ADMIN_LASTNAME", "Admin"),
-        TemporaryPassword = string.IsNullOrWhiteSpace(adminPassword) ? null : adminPassword.Trim(),
-        PictureUrl = ReadEnvOrDefault("ADMIN_PICTURE", "default.jpg")
-    };
-}
-
-static string PrepareSqliteConnectionString(string connectionString, string? dataDirectory, string contentRoot)
-{
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-        connectionString = "Data Source=local.db";
-    }
-
-    var builder = new SqliteConnectionStringBuilder(connectionString);
-
-    if (!string.IsNullOrWhiteSpace(dataDirectory))
-    {
-        var absolute = Path.IsPathFullyQualified(dataDirectory)
-            ? dataDirectory
-            : Path.GetFullPath(Path.Combine(contentRoot, dataDirectory));
-
-        Directory.CreateDirectory(absolute);
-        
-        // Extract just the filename if DataSource is a relative path, otherwise use the full path
-        var dataSource = builder.DataSource;
-        if (!Path.IsPathFullyQualified(dataSource))
-        {
-            // If relative, just use the filename
-            dataSource = Path.GetFileName(dataSource);
-        }
-        else
-        {
-            // If absolute, extract just the filename to place in the data directory
-            dataSource = Path.GetFileName(dataSource);
-        }
-        
-        builder.DataSource = Path.Combine(absolute, dataSource);
-    }
-    else if (!Path.IsPathFullyQualified(builder.DataSource))
-    {
-        // If no data directory is specified and DataSource is relative, make it relative to content root
-        var dbPath = Path.Combine(contentRoot, builder.DataSource);
-        var dbDir = Path.GetDirectoryName(dbPath);
-        if (!string.IsNullOrWhiteSpace(dbDir))
-        {
-            Directory.CreateDirectory(dbDir);
-        }
-        builder.DataSource = dbPath;
-    }
-
-    // Set cache mode if not already specified
-    if (!connectionString.Contains("Cache=", StringComparison.OrdinalIgnoreCase))
-    {
-        builder.Cache = SqliteCacheMode.Shared;
-    }
-    
-    return builder.ToString();
-}
-
-static string ReadEnvOrDefault(string key, string defaultValue)
-{
-    var value = Environment.GetEnvironmentVariable(key);
-    return string.IsNullOrWhiteSpace(value) ? defaultValue : value.Trim();
-}
-
-static bool ReadEnvFlag(string key, bool defaultValue = false)
-{
-    var value = Environment.GetEnvironmentVariable(key);
-    if (string.IsNullOrWhiteSpace(value))
-    {
-        return defaultValue;
-    }
-
-    var normalized = value.Trim();
-    return normalized.Equals("1", StringComparison.OrdinalIgnoreCase)
-        || normalized.Equals("true", StringComparison.OrdinalIgnoreCase)
-        || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase);
-}
-
-static async Task InitializeDatabaseIfFirstRunAsync(IServiceProvider services, ILogger logger, CancellationToken cancellationToken = default)
-{
-    using var scope = services.CreateScope();
-    var scopedProvider = scope.ServiceProvider;
-    var context = scopedProvider.GetRequiredService<ApplicationDbContext>();
-
-    var isFirstRun = await IsFirstRunAsync(context, logger, cancellationToken);
-    if (!isFirstRun)
-    {
-        return;
-    }
-
-    logger.LogInformation("First run detected; applying migrations and seeding baseline data.");
-    try
-    {
-        await context.Database.MigrateAsync(cancellationToken);
-        SeedInitialData.SeedData(scopedProvider);
-        logger.LogInformation("First run initialization completed.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "First run initialization failed.");
-        throw;
-    }
-}
-
-static async Task<bool> IsFirstRunAsync(ApplicationDbContext context, ILogger logger, CancellationToken cancellationToken = default)
-{
-    try
-    {
-        var appliedMigrations = await context.Database.GetAppliedMigrationsAsync(cancellationToken);
-        return !appliedMigrations.Any();
-    }
-    catch (Exception ex)
-    {
-        logger.LogWarning(ex, "Unable to read database migration history; assuming first run.");
-        return true;
-    }
-}
 
 static string ResolveDesktopDataDirectory()
 {
@@ -398,6 +187,10 @@ static string ResolveDesktopDataDirectory()
         baseRoot = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     }
 
+    // Keep the existing desktop data location; renaming code must not select a fresh database.
     var appRoot = Path.Combine(baseRoot, "flashvenom", "openfire");
     return Path.Combine(appRoot, "openfire-host", "data");
 }
+
+// Exposed for isolated WebApplicationFactory integration tests.
+public partial class Program { }

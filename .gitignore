@@ -366,3 +366,18 @@ FodyWeavers.xsd
 /build/web
 /src/Quickfire.Desktop/Tray/app.publish
 /src/Quickfire.Desktop/Tray
+
+# Local Openfire configuration and user data
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+/src/Quickfire.Blazor/wwwroot/uploads/
+/output/
+/.playwright-cli/

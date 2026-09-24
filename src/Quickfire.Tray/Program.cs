@@ -9,14 +9,12 @@ namespace Quickfire.Tray
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            AutoStartHelper.AddToStartup(); // Add shortcut to startup
-            Console.WriteLine("Starting Quickfire.Tray");
-
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new SystemTray());
+            if (args.Length != 0 && (args.Length != 2 || args[0] != "--credential-directory")) return;
+            Application.Run(new SystemTray(args.Length == 2 ? args[1] : null));
         }
     }
 }

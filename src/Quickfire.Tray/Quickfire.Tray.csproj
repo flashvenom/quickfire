@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -24,8 +24,8 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <InstallUrl>\\192.168.1.13\trayinstaller\</InstallUrl>
-    <ApplicationRevision>4</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.2.0.0</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -82,6 +82,7 @@
     <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
   </ItemGroup>
@@ -139,22 +140,22 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Common">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.Json">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting">
-      <Version>9.0.3</Version>
+      <Version>10.0.12</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Office.Interop.Outlook">
       <Version>15.0.4797.1004</Version>
@@ -235,4 +236,7 @@
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <ProjectReference Include="../Quickfire.Shared/Quickfire.Shared.csproj" />
+  </ItemGroup>
 </Project>
