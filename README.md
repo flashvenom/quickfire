@@ -91,7 +91,7 @@ Copy-Item src/Quickfire.Blazor/.env.example src/Quickfire.Blazor/.env
 Edit **`src/Quickfire.Blazor/.env`**:
 
 - Set `ADMIN_PASSWORD` to a unique, strong password. **There is no shared default password.**
-- Set `SYNCFUSION` to your license key.
+- Set `SYNCFUSION` to your license key which can be obtained for free as a [Syncfusion Community License](https://www.syncfusion.com/downloads/blazor).
 - Keep the example SQLite connection for a local installation.
 - The first account defaults to `admin@quickfire.local`. Set `ADMIN_EMAIL` and `ADMIN_USERNAME` if you want to change it.
 
