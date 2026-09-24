@@ -10,7 +10,7 @@ jobs:
       QUICKFIRE_BROWSER_SYNCFUSION_LICENSE: ${{ secrets.QUICKFIRE_BROWSER_SYNCFUSION_LICENSE || secrets.OPENFIRE_BROWSER_SYNCFUSION_LICENSE }}
       QUICKFIRE_BROWSER_HOST_DIR: ${{ github.workspace }}/artifacts/browser-host
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
