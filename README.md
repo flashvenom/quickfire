@@ -58,6 +58,8 @@ Stale login cookies are cleared when their account no longer exists, and daily t
 
 [Full 1.2 release notes →](docs/wiki/Release-v1.2.md)
 
+![Quickfire](https://quickfireams.com/images/github/settings.png)
+
 ## Loadout
 
 | Under the hood                              | What it does                                                      |
@@ -110,6 +112,8 @@ Open the HTTPS address printed by the app and sign in with your configured accou
 Missing or invalid first-run password? Fix it and restart. Setup resumes safely; later startups preserve existing accounts and passwords.
 
 **Upgrading?** Back up the database and attachments first, then keep your existing connection and storage settings. Follow [Getting started](docs/wiki/Getting-Started.md) for configuration, upgrades, recovery, and storage details.
+
+![Quickfire](https://quickfireams.com/images/github/policies.png)
 
 ## Bring your wingmen
 
