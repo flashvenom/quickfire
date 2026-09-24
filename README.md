@@ -29,10 +29,10 @@ Openfire is the open source core framework of Quickfire and is focused on workfl
 ## Scope
 - **Know your book.** Keep clients, contacts, addresses, locations, policies, and carriers together.
 - **Keep renewals moving.** Organize leads, quotes, submissions, tasks, and the next thing that needs doing.
-- **Give paperwork a home.** Upload attachments, find the right document, and keep it tied to the right client or policy.
-- **Put forms to work.** Manage reusable PDF forms and versions, fill applications, and work with certificates in the built-in editors.
+- **Give paperwork a home.** Upload attachments, find the right document, and keep it tied to the right policy.
+- **Put forms to work** by managing PDF revisions, non-destructable fills, and built-in editors.
 - **Get the details out of your head.** Track tasks, dates, notes, policy limits, rates, and coverages.
-- **Keep the team's playbook alive.** Publish procedures in the Company Manual with search, suggested edits, and revision history.
+- **Keep the team running** by publishing procedures in the Company Manual.
 - **Consolidate your APIs** to track payments, phone calls, leads, documents, and forms in one place.
 - **Use OpenAI integration** to build custom prompts for data entry, summaries, and workflows.
 - **Centralize all the things** from renewals, quotes, leads, and submissions with clear next actions.
