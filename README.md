@@ -113,6 +113,8 @@ Missing or invalid first-run password? Fix it and restart. Setup resumes safely;
 
 **Upgrading?** Back up the database and attachments first, then keep your existing connection and storage settings. Follow [Getting started](docs/wiki/Getting-Started.md) for configuration, upgrades, recovery, and storage details.
 
+##
+
 ![Quickfire](https://quickfireams.com/images/github/policies.png)
 
 ## Bring your wingmen
