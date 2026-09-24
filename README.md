@@ -27,17 +27,17 @@ Openfire is the open source core framework of Quickfire and is focused on workfl
 ![Quickfire](https://quickfireams.com/images/github/renewals-small.png)
 
 ## Scope
-- **Know your book.** Keep clients, contacts, addresses, locations, policies, and carriers together.
-- **Keep renewals moving.** Organize leads, quotes, submissions, tasks, and the next thing that needs doing.
-- **Give paperwork a home.** Upload attachments, find the right document, and keep it tied to the right policy.
-- **Put forms to work** by managing PDF revisions, non-destructable fills, and built-in editors.
-- **Get the details out of your head.** Track tasks, dates, notes, policy limits, rates, and coverages.
-- **Keep the team running** by publishing procedures in the Company Manual.
-- **Consolidate your APIs** to track payments, phone calls, leads, documents, and forms in one place.
-- **Use OpenAI integration** to build custom prompts for data entry, summaries, and workflows.
-- **Centralize all the things** from renewals, quotes, leads, and submissions with clear next actions.
-- **Talk to your data** in natural language to unlock bleeding edge insights and time savers.
-- **Spawn background workers** to handle follow ups, perform routine duties and more.
+- **KNOW YOUR BOOK.** Keep clients, contacts, addresses, locations, policies, and carriers together.
+- **KEEP RENEWALS MOVING.** Organize leads, quotes, submissions, tasks, and the next thing that needs doing.
+- **GIVE PAPERWORK A HOME.** Upload attachments, find the right document, and keep it tied to the right policy.
+- **PUT FORMS TO WORK** by managing PDF revisions, non-destructable fills, and built-in editors.
+- **GET THE DETAILS** out of your head. Track tasks, dates, notes, policy limits, rates, and coverages.
+- **KEEP THE TEAM RUNNING** by publishing procedures in the Company Manual.
+- **CONSOLODATE YOUR APIs** to track payments, phone calls, leads, documents, and forms in one place.
+- **USE OpenAI INTEGRATIONS** to build custom prompts for data entry, summaries, and workflows.
+- **CENTRALIZE ALL THE THINGS** from renewals, quotes, leads, and submissions with clear next actions.
+- **TALK TO YOUR DATA** in natural language to unlock bleeding edge insights and time savers.
+- **SPAWN BACKGROUND WORKERS** to handle follow ups, perform routine duties and more.
 
 ![Quickfire renewal workspace with tasks and an activity log](https://quickfireams.com/images/github/renewals-small.png)
 
