@@ -152,6 +152,14 @@
             {
                 await _stateService.InitializeStateAsync(AuthStateProvider.GetAuthenticationStateAsync());
             }
+
+            if (_stateService.CurrentUser is null)
+            {
+                NavigationManager.NavigateTo(
+                    $"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}",
+                    forceLoad: true);
+                return;
+            }
         }
         catch (Exception ex)
         {
