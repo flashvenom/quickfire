@@ -38,7 +38,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
-		<PackageReference Include="DotNetEnv" Version="3.1.1" />
+		<PackageReference Include="DotNetEnv" Version="3.2.0" />
 		<PackageReference Include="Docnet.Core" Version="2.6.0" />
 		<PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
 		<PackageReference Include="itext7" Version="9.4.0" />
